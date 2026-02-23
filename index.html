@@ -581,15 +581,38 @@
         document.getElementById('cam-moon').addEventListener('click', () => focusCameraOn('moon'));
 
         document.getElementById('btn-toggle-planets').addEventListener('click', function() {
-            isPlanetsEnabled = !isPlanetsEnabled; planetsGroup.visible = isPlanetsEnabled;
-            if(isPlanetsEnabled) {
-                this.classList.add('planet-btn-active'); this.innerHTML = "🌌 隐藏外层行星"; focusCameraOn('system', new THREE.Vector3(0, 800, 1400));
-                updateTooltip("🪐 太阳系全家福", "现在你可以用鼠标【点击任意行星】查看它的科普信息卡片啦！在地心说下更能看到扭曲的行星逆行轨迹！", "✨");
-            } else {
-                this.classList.remove('planet-btn-active'); this.innerHTML = "🪐 开启八大行星运行"; focusCameraOn('system');
-                document.getElementById('planet-info-card').classList.add('card-hidden'); 
-            }
+    isPlanetsEnabled = !isPlanetsEnabled; 
+    planetsGroup.visible = isPlanetsEnabled;
+    
+    if(isPlanetsEnabled) {
+        this.classList.add('planet-btn-active'); 
+        this.innerHTML = "🌌 隐藏外层行星"; 
+        focusCameraOn('system', new THREE.Vector3(0, 800, 1400));
+        updateTooltip("🪐 太阳系全家福", "现在你可以用鼠标【点击任意行星】查看它的科普信息卡片啦！在地心说下更能看到扭曲的行星逆行轨迹！", "✨");
+    } else {
+        this.classList.remove('planet-btn-active'); 
+        this.innerHTML = "🪐 开启八大行星运行"; 
+        focusCameraOn('system');
+        document.getElementById('planet-info-card').classList.add('card-hidden'); 
+    }
+
+    // 👉 终极修复：使用真实的变量名 'planetsData' 清空所有行星轨迹
+    if (typeof planetsData !== 'undefined') {
+        planetsData.forEach(item => {
+            if (item.trailPoints) item.trailPoints = [];
+            if (item.trailLine) item.trailLine.geometry.setFromPoints([]);
         });
+    }
+
+    // 👉 顺手修复：把单独记录的太阳轨迹也一并清空
+    if (typeof sunTrailPoints !== 'undefined') {
+        sunTrailPoints.length = 0; // 清空太阳轨迹数组
+        if (typeof sunTrailLine !== 'undefined') {
+            sunTrailLine.geometry.setFromPoints([]);
+        }
+    }
+});
+
 
         document.getElementById('btn-toggle-tilt').addEventListener('click', function() {
             isEarthTilted = !isEarthTilted; targetTilt = isEarthTilted ? -23.5 * Math.PI/180 : 0;
@@ -823,3 +846,4 @@
     </script>
 </body>
 </html>
+
