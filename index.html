@@ -470,7 +470,7 @@
             if(p.map) matParams.map = p.map; else matParams.color = p.color;
             
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 32, 32), new THREE.MeshStandardMaterial(matParams));
-            mesh.castShadow = true; mesh.receiveShadow = true;
+            mesh.castShadow = false; mesh.receiveShadow = true;
             mesh.userData = { isPlanet: true, config: p };
             
             if(p.hasRings) {
