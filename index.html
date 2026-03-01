@@ -682,14 +682,14 @@
                 if(!showTerminator) document.getElementById('btn-toggle-terminator').click();
                 if(!isEarthTilted) document.getElementById('btn-toggle-tilt').click();
                 if(!isShowSunlight) document.getElementById('btn-sunlight').click();
-                timeDays = 365.25 * 0.25; setObservationMode(0.05, 'earth', new THREE.Vector3(0, 30, 0)); 
+                timeDays = 365.25 * 0.5; setObservationMode(0.05, 'earth', new THREE.Vector3(0, 30, 0)); 
                 btnSpan.innerText = "北极俯视"; btnSpan.className = "bg-blue-600 text-white px-1 rounded text-[10px]";
                 updateTooltip("❄️ 北极极昼现象", "已切换至夏至俯视视角（北极正上方）。结合新加的阳光射线，你能清楚看到晨昏线完美切分北极圈，此时北极圈内全天处于白昼。", "🌞");
             } else if (polarViewMode === 2) { 
                 if(!showPolars) document.getElementById('btn-toggle-polars').click();
                 if(!showTerminator) document.getElementById('btn-toggle-terminator').click();
                 if(!isEarthTilted) document.getElementById('btn-toggle-tilt').click();
-                timeDays = 365.25 * 0.75; setObservationMode(0.05, 'earth', new THREE.Vector3(0, -30, 0)); 
+                timeDays = 0; setObservationMode(0.05, 'earth', new THREE.Vector3(0, -30, 0)); 
                 btnSpan.innerText = "南极俯视"; btnSpan.className = "bg-red-600 text-white px-1 rounded text-[10px]";
                 updateTooltip("🐧 南极极昼现象", "已切换至冬至仰视视角（南极正下方）。此时太阳直射南回归线，南极圈内全天处于白昼。", "🌞");
             } else { 
