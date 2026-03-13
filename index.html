@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
-        body { margin: 0; overflow: hidden; background-color: #030304; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+        body { margin: 0; overflow: hidden; background-color: #030304 !important; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; }
         
@@ -43,7 +43,7 @@
         #left-panel-wrapper { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); will-change: transform; }
     </style>
 </head>
-<body>
+<body class="bg-[#030304] text-white">
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
@@ -53,7 +53,9 @@
                 <span class="text-gray-400 hidden sm:inline">|</span>
                 <span class="text-green-300 font-bold text-sm">目标: <span id="target-status" class="text-white">系统全景</span></span>
                 <span class="text-gray-400">|</span>
-                <span class="text-purple-300 font-bold text-sm">🗓️ 日期: <span id="date-status" class="text-white w-36 inline-block">计算中...</span></span>
+                <span class="text-purple-300 font-bold text-sm">🗓️ 日期: <span id="date-status" class="text-white w-32 sm:w-36 inline-block">计算中...</span></span>
+                <span class="text-gray-400 hidden sm:inline">|</span>
+                <span class="text-indigo-300 font-bold text-sm hidden sm:inline">🌔 月相: <span id="moon-phase-status" class="text-white w-24 inline-block">计算中...</span></span>
             </div>
             <button id="btn-fullscreen" class="glass-panel px-4 py-2 rounded-full pointer-events-auto text-white hover:bg-white/10 text-sm transition cursor-pointer">🎦 全屏</button>
         </div>
@@ -111,11 +113,14 @@
                     </div>
 
                     <div class="bg-purple-900/30 p-3 rounded-xl border border-purple-500/30">
-                        <h3 class="text-purple-300 font-bold text-xs mb-2">🌗 食相奇观观测</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="btn-solar-eclipse" class="bg-black hover:bg-gray-900 border border-gray-500 text-gray-200 font-bold py-1.5 px-2 rounded-lg text-xs transition cursor-pointer">🌑 观测日全食</button>
-                            <button id="btn-lunar-eclipse" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-200 font-bold py-1.5 px-2 rounded-lg text-xs transition cursor-pointer">🌕 观测血月</button>
+                        <h3 class="text-purple-300 font-bold text-xs mb-2">🌗 罕见食相搜寻仪</h3>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <button id="btn-solar-eclipse" class="bg-black hover:bg-gray-900 border border-gray-500 text-gray-200 font-bold py-1.5 px-1 rounded-lg text-xs transition cursor-pointer">🌑 寻下一次日食</button>
+                            <button id="btn-lunar-eclipse" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-200 font-bold py-1.5 px-1 rounded-lg text-xs transition cursor-pointer">🌕 寻下一次血月</button>
                         </div>
+                        <button id="btn-moon-phases" class="w-full bg-indigo-950 hover:bg-indigo-900 border border-indigo-700 text-indigo-200 font-bold py-1.5 px-2 rounded-lg text-xs transition cursor-pointer flex justify-center items-center gap-2">
+                            🌖 演示月相盈亏周期
+                        </button>
                     </div>
 
                     <div class="bg-blue-900/30 p-3 rounded-xl border border-blue-500/30 flex-grow flex flex-col">
@@ -168,20 +173,15 @@
     </div>
 
     <script>
-        // 【移动端优化修复】解决 iOS Safari 面板无法顺利缩放的问题
         const panelWrapper = document.getElementById('left-panel-wrapper');
         const btnTogglePanel = document.getElementById('btn-toggle-panel');
         const panelArrow = document.getElementById('panel-arrow');
         let isPanelOpen = true;
 
         const handleTogglePanel = (e) => {
-            // 如果是触摸事件，立刻阻止默认行为，防止 300ms 延迟和 hover 冲突
-            if (e.type === 'touchstart' && e.cancelable) {
-                e.preventDefault(); 
-            }
+            if (e.type === 'touchstart' && e.cancelable) e.preventDefault(); 
             e.stopPropagation(); 
             isPanelOpen = !isPanelOpen;
-            
             if (isPanelOpen) {
                 panelWrapper.style.transform = 'translate3d(0, 0, 0)';
                 panelArrow.style.transform = 'rotate(0deg)';
@@ -190,34 +190,28 @@
                 panelArrow.style.transform = 'rotate(180deg)';
             }
         };
-
         btnTogglePanel.addEventListener('click', handleTogglePanel);
         btnTogglePanel.addEventListener('touchstart', handleTogglePanel, { passive: false });
 
-        // === 1. 初始化引擎 ===
         const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030304);
+
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100000); 
-        // 开启多重采样抗锯齿 (MSAA)
+        camera.position.set(0, 800, 2000); 
+
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // 匹配设备像素比，提升视网膜屏幕清晰度
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
-        // 使用 PCFSoft 阴影滤镜，产生柔和自然的边缘（半影效果）
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; 
-        controls.dampingFactor = 0.05; 
-        controls.minDistance = 3.5;  
-        controls.maxDistance = 6000; 
+        controls.enableDamping = true; controls.dampingFactor = 0.05; controls.minDistance = 3.5; controls.maxDistance = 6000; 
 
         const clock = new THREE.Clock();
         const textureLoader = new THREE.TextureLoader();
-
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
+        const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
 
         const starsGeo = new THREE.BufferGeometry(); const starsPos = [];
         for(let i=0; i<4000; i++) {
@@ -228,111 +222,61 @@
         scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({color:0xffffff, size:1.2, transparent:true, opacity:0.8})));
         
         scene.add(new THREE.AmbientLight(0x111118, 0.2)); 
+        const sunLight = new THREE.PointLight(0xffeedd, 1.0, 6000); scene.add(sunLight);
         
-        const sunLight = new THREE.PointLight(0xffeedd, 1.0, 6000); 
-        scene.add(sunLight);
-        
-        // 【核心光影升级】提升产生阴影的平行光强度，扩大视锥体并增加超清抗锯齿阴影贴图
         const shadowLight = new THREE.DirectionalLight(0xffffff, 4.0);
-        shadowLight.castShadow = true;
-        shadowLight.shadow.mapSize.width = 4096; // 4K 阴影分辨率
-        shadowLight.shadow.mapSize.height = 4096;
-        shadowLight.shadow.camera.near = 0.5; 
-        shadowLight.shadow.camera.far = 800;
-        // 扩大计算区到 30，确保月球始终在物理阴影计算范围内
-        shadowLight.shadow.camera.left = -30; 
-        shadowLight.shadow.camera.right = 30;
-        shadowLight.shadow.camera.top = 30; 
-        shadowLight.shadow.camera.bottom = -30;
-        shadowLight.shadow.bias = -0.0005; 
-        shadowLight.shadow.radius = 4; // 柔化阴影边缘抗锯齿
+        shadowLight.castShadow = true; 
+        shadowLight.shadow.mapSize.width = 2048; 
+        shadowLight.shadow.mapSize.height = 2048;
+        shadowLight.shadow.camera.near = 0.5; shadowLight.shadow.camera.far = 800;
+        shadowLight.shadow.camera.left = -30; shadowLight.shadow.camera.right = 30;
+        shadowLight.shadow.camera.top = 30; shadowLight.shadow.camera.bottom = -30;
+        shadowLight.shadow.bias = -0.0005; shadowLight.shadow.radius = 4;
         scene.add(shadowLight);
 
-        // === 2. 天体构建 ===
-        const SUN_RADIUS = 30;
-        const R_EARTH = 3;
-        const DIST_EARTH = 200; 
-        const DIST_MOON = R_EARTH * 6; 
+        const SUN_RADIUS = 30; const R_EARTH = 3; const DIST_EARTH = 200; const DIST_MOON = R_EARTH * 6; 
+        const INCLINATION = 20 * Math.PI / 180; 
 
-        const sunGroup = new THREE.Group();
-        scene.add(sunGroup);
+        const sunGroup = new THREE.Group(); scene.add(sunGroup);
 
-        const sunVertexShader = `
-            varying vec2 vUv; varying vec3 vPosition; varying vec3 vNormal; varying vec3 vViewPosition;
-            void main() {
-                vUv = uv; vPosition = position; vNormal = normalize(normalMatrix * normal);
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz;
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `;
-
+        const sunVertexShader = `varying vec2 vUv; varying vec3 vPosition; varying vec3 vNormal; varying vec3 vViewPosition; void main() { vUv = uv; vPosition = position; vNormal = normalize(normalMatrix * normal); vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }`;
         const sunFragmentShader = `
-            uniform float time;
-            varying vec2 vUv; varying vec3 vPosition; varying vec3 vNormal; varying vec3 vViewPosition;
+            uniform float time; varying vec2 vUv; varying vec3 vPosition; varying vec3 vNormal; varying vec3 vViewPosition;
             vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; } vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
             vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); } vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
             float snoise(vec3 v) {
-                const vec2  C = vec2(1.0/6.0, 1.0/3.0); const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
-                vec3 i  = floor(v + dot(v, C.yyy) ); vec3 x0 = v - i + dot(i, C.xxx) ; vec3 g = step(x0.yzx, x0.xyz); vec3 l = 1.0 - g;
-                vec3 i1 = min( g.xyz, l.zxy ); vec3 i2 = max( g.xyz, l.zxy );
-                vec3 x1 = x0 - i1 + C.xxx; vec3 x2 = x0 - i2 + C.yyy; vec3 x3 = x0 - D.yyy; i = mod289(i);
-                vec4 p = permute( permute( permute( i.z + vec4(0.0, i1.z, i2.z, 1.0 )) + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
-                float n_ = 0.142857142857; vec3  ns = n_ * D.wyz - D.xzx; vec4 j = p - 49.0 * floor(p * ns.z * ns.z); vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_ );
-                vec4 x = x_ *ns.x + ns.yyyy; vec4 y = y_ *ns.x + ns.yyyy; vec4 h = 1.0 - abs(x) - abs(y); vec4 b0 = vec4( x.xy, y.xy ); vec4 b1 = vec4( x.zw, y.zw );
-                vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
-                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ; vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
-                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3))); p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0); m = m * m; return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+                const vec2  C = vec2(1.0/6.0, 1.0/3.0); const vec4  D = vec4(0.0, 0.5, 1.0, 2.0); vec3 i  = floor(v + dot(v, C.yyy) ); vec3 x0 = v - i + dot(i, C.xxx) ; vec3 g = step(x0.yzx, x0.xyz); vec3 l = 1.0 - g; vec3 i1 = min( g.xyz, l.zxy ); vec3 i2 = max( g.xyz, l.zxy ); vec3 x1 = x0 - i1 + C.xxx; vec3 x2 = x0 - i2 + C.yyy; vec3 x3 = x0 - D.yyy; i = mod289(i); vec4 p = permute( permute( permute( i.z + vec4(0.0, i1.z, i2.z, 1.0 )) + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) + i.x + vec4(0.0, i1.x, i2.x, 1.0 )); float n_ = 0.142857142857; vec3  ns = n_ * D.wyz - D.xzx; vec4 j = p - 49.0 * floor(p * ns.z * ns.z); vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_ ); vec4 x = x_ *ns.x + ns.yyyy; vec4 y = y_ *ns.x + ns.yyyy; vec4 h = 1.0 - abs(x) - abs(y); vec4 b0 = vec4( x.xy, y.xy ); vec4 b1 = vec4( x.zw, y.zw ); vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0)); vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ; vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w); vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3))); p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w; vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0); m = m * m; return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
             }
             float fbm(vec3 p) { float f = 0.0; float w = 0.5; for (int i = 0; i < 5; i++) { f += w * snoise(p); p *= 2.0; w *= 0.5; } return f; }
             void main() {
-                vec3 p = vPosition * 0.06; float noiseVal = fbm(p + time * 0.3);
-                vec3 col1 = vec3(0.5, 0.0, 0.0); vec3 col2 = vec3(1.0, 0.3, 0.0); vec3 col3 = vec3(1.0, 0.8, 0.2); vec3 col4 = vec3(1.0, 1.0, 0.9);
-                vec3 color = mix(col1, col2, smoothstep(-0.5, 0.1, noiseVal)); color = mix(color, col3, smoothstep(0.1, 0.5, noiseVal)); color = mix(color, col4, smoothstep(0.5, 1.0, noiseVal));
-                vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition);
-                float fresnel = dot(normal, viewDir); fresnel = clamp(1.0 - fresnel, 0.0, 1.0); fresnel = pow(fresnel, 3.0);
-                color += vec3(1.0, 0.6, 0.1) * fresnel * 1.5; gl_FragColor = vec4(color, 1.0);
+                vec3 p = vPosition * 0.06; float noiseVal = fbm(p + time * 0.3); vec3 col1 = vec3(0.5, 0.0, 0.0); vec3 col2 = vec3(1.0, 0.3, 0.0); vec3 col3 = vec3(1.0, 0.8, 0.2); vec3 col4 = vec3(1.0, 1.0, 0.9); vec3 color = mix(col1, col2, smoothstep(-0.5, 0.1, noiseVal)); color = mix(color, col3, smoothstep(0.1, 0.5, noiseVal)); color = mix(color, col4, smoothstep(0.5, 1.0, noiseVal)); vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition); float fresnel = dot(normal, viewDir); fresnel = clamp(1.0 - fresnel, 0.0, 1.0); fresnel = pow(fresnel, 3.0); color += vec3(1.0, 0.6, 0.1) * fresnel * 1.5; gl_FragColor = vec4(color, 1.0);
             }
         `;
-
         const sunShaderMaterial = new THREE.ShaderMaterial({ vertexShader: sunVertexShader, fragmentShader: sunFragmentShader, uniforms: { time: { value: 0.0 } } });
-        const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(SUN_RADIUS, 64, 64), sunShaderMaterial);
-        sunGroup.add(sunMesh);
+        const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(SUN_RADIUS, 64, 64), sunShaderMaterial); sunGroup.add(sunMesh);
 
         const glowCanvas = document.createElement('canvas'); glowCanvas.width = 512; glowCanvas.height = 512; const glowCtx = glowCanvas.getContext('2d');
         const glowGrad = glowCtx.createRadialGradient(256, 256, SUN_RADIUS*0.8, 256, 256, 256);
         glowGrad.addColorStop(0, 'rgba(255, 255, 255, 1)'); glowGrad.addColorStop(0.1, 'rgba(255, 200, 50, 0.8)'); glowGrad.addColorStop(0.3, 'rgba(255, 100, 0, 0.4)'); glowGrad.addColorStop(0.6, 'rgba(150, 0, 0, 0.1)'); glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         glowCtx.fillStyle = glowGrad; glowCtx.fillRect(0, 0, 512, 512);
-        
         const spriteMaterial = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(glowCanvas), color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
         const innerGlow = new THREE.Sprite(spriteMaterial); innerGlow.scale.set(SUN_RADIUS * 4.5, SUN_RADIUS * 4.5, 1); sunGroup.add(innerGlow);
         const outerGlow = new THREE.Sprite(spriteMaterial); outerGlow.scale.set(SUN_RADIUS * 8, SUN_RADIUS * 8, 1); outerGlow.material.opacity = 0.5; sunGroup.add(outerGlow);
 
-        // --- 地球与月球 ---
         const earthPosGroup = new THREE.Group(); scene.add(earthPosGroup); 
         let currentTilt = -23.5 * Math.PI/180; let targetTilt = currentTilt; let isEarthTilted = true;
         const earthTiltGroup = new THREE.Group(); earthTiltGroup.rotation.z = currentTilt; earthPosGroup.add(earthTiltGroup); 
         
-        const earthMat = new THREE.MeshStandardMaterial({
-            color: 0xffffff, map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'),
-            bumpMap: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png'), bumpScale: 0.1, roughness: 0.7
-        });
-        const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 64, 64), earthMat);
-        earthMesh.castShadow = true; earthMesh.receiveShadow = true; earthTiltGroup.add(earthMesh); 
+        const earthMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'), bumpMap: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png'), bumpScale: 0.1, roughness: 0.7 });
+        const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 64, 64), earthMat); earthMesh.castShadow = true; earthMesh.receiveShadow = true; earthTiltGroup.add(earthMesh); 
 
         const heatmapVertexShader = `varying vec3 vNormal; void main() { vNormal = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
         const heatmapFragmentShader = `
             uniform vec3 localSunDir; varying vec3 vNormal;
-            void main() {
-                float intensity = dot(normalize(vNormal), normalize(localSunDir)); float t = smoothstep(-0.2, 0.9, intensity);
-                vec3 c0 = vec3(0.0, 0.0, 0.5); vec3 c1 = vec3(0.0, 0.5, 1.0); vec3 c2 = vec3(0.0, 1.0, 0.5); vec3 c3 = vec3(1.0, 1.0, 0.0); vec3 c4 = vec3(1.0, 0.0, 0.0); vec3 color;
-                if(t < 0.25) color = mix(c0, c1, t / 0.25); else if(t < 0.5) color = mix(c1, c2, (t - 0.25) / 0.25); else if(t < 0.75) color = mix(c2, c3, (t - 0.5) / 0.25); else color = mix(c3, c4, (t - 0.75) / 0.25);
-                gl_FragColor = vec4(color * 1.2, 0.85);
-            }
+            void main() { float intensity = dot(normalize(vNormal), normalize(localSunDir)); float t = smoothstep(-0.2, 0.9, intensity); vec3 c0 = vec3(0.0, 0.0, 0.5); vec3 c1 = vec3(0.0, 0.5, 1.0); vec3 c2 = vec3(0.0, 1.0, 0.5); vec3 c3 = vec3(1.0, 1.0, 0.0); vec3 c4 = vec3(1.0, 0.0, 0.0); vec3 color; if(t < 0.25) color = mix(c0, c1, t / 0.25); else if(t < 0.5) color = mix(c1, c2, (t - 0.25) / 0.25); else if(t < 0.75) color = mix(c2, c3, (t - 0.5) / 0.25); else color = mix(c3, c4, (t - 0.75) / 0.25); gl_FragColor = vec4(color * 1.2, 0.85); }
         `;
         const heatmapMaterial = new THREE.ShaderMaterial({ vertexShader: heatmapVertexShader, fragmentShader: heatmapFragmentShader, uniforms: { localSunDir: { value: new THREE.Vector3(1, 0, 0) } }, transparent: true, blending: THREE.NormalBlending, depthWrite: false });
         const heatmapMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.004, 64, 64), heatmapMaterial); heatmapMesh.visible = false; earthMesh.add(heatmapMesh);
-
         const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.008, 64, 64), new THREE.MeshStandardMaterial({ map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png'), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); earthMesh.add(cloudMesh);
 
         const makeLatLine = (lat, color, isDashed=false) => {
@@ -343,17 +287,20 @@
         };
         const equatorLine = makeLatLine(0, 0x00ff00); const northTropicLine = makeLatLine(23.5, 0xffff00, true); const southTropicLine = makeLatLine(-23.5, 0xffff00, true);
         const northPolarLine = makeLatLine(66.5, 0x00ffff, true); northPolarLine.visible = false; const southPolarLine = makeLatLine(-66.5, 0x00ffff, true); southPolarLine.visible = false;
-
         const terminatorMesh = new THREE.Mesh(new THREE.TorusGeometry(R_EARTH * 1.012, 0.04, 16, 100), new THREE.MeshBasicMaterial({color: 0xff4400, transparent: true, opacity: 0.8}));
         terminatorMesh.visible = false; earthPosGroup.add(terminatorMesh); 
 
-        const moonGroup = new THREE.Group(); earthPosGroup.add(moonGroup); moonGroup.rotation.x = 5.14 * Math.PI/180; 
+        const lunarNodeGroup = new THREE.Group(); earthPosGroup.add(lunarNodeGroup);
+        const lunarTiltGroup = new THREE.Group(); lunarTiltGroup.rotation.x = INCLINATION; lunarNodeGroup.add(lunarTiltGroup);
+        const moonGroup = new THREE.Group(); lunarTiltGroup.add(moonGroup);
+
         const moonMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-water.png'), roughness: 0.9 });
         const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH*0.27, 32, 32), moonMat);
         moonMesh.castShadow = true; moonMesh.receiveShadow = true; moonGroup.add(moonMesh);
 
         const makeOrbit = (dist, color, opacity=0.4, segments=256) => { const pts = []; for(let i=0; i<=segments; i++) pts.push(new THREE.Vector3(dist*Math.cos(i/segments*Math.PI*2), 0, dist*Math.sin(i/segments*Math.PI*2))); return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: color, transparent:true, opacity:opacity})); };
-        const earthOrbit = makeOrbit(DIST_EARTH, 0x3b82f6); scene.add(earthOrbit); moonGroup.add(makeOrbit(DIST_MOON, 0xffffff, 0.2, 64));
+        const earthOrbit = makeOrbit(DIST_EARTH, 0x3b82f6); scene.add(earthOrbit); 
+        lunarTiltGroup.add(makeOrbit(DIST_MOON, 0xffffff, 0.2, 64));
 
         let isShowSubsolar = false; const subsolarMarker = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({color: 0xff0000})); subsolarMarker.visible = false; earthMesh.add(subsolarMarker);
         let isShowSunlight = false; const sunlightGroup = new THREE.Group(); sunlightGroup.visible = false; earthPosGroup.add(sunlightGroup); const sunArrows = [];
@@ -366,30 +313,22 @@
         const createSaturnRingTexture = () => { const c = document.createElement('canvas'); c.width = 256; c.height = 4; const ctx = c.getContext('2d'); const g = ctx.createLinearGradient(0,0,256,0); g.addColorStop(0, 'rgba(210,180,140,0)'); g.addColorStop(0.2, 'rgba(210,180,140,0.8)'); g.addColorStop(0.5, 'rgba(230,200,160,0.9)'); g.addColorStop(0.8, 'rgba(180,150,110,0)'); ctx.fillStyle = g; ctx.fillRect(0,0,256,4); return new THREE.CanvasTexture(c); };
 
         const planetsConfig = [
-            { id: 'mercury', name: '水星', r: R_EARTH*0.38, dist: 80, period: 88, color: 0x888888, desc: '距离太阳最近的行星，体积最小，没有大气层保护，被太阳猛烈炙烤导致昼夜温差极大。' },
-            { id: 'venus', name: '金星', r: R_EARTH*0.95, dist: 130, period: 225, color: 0xe3bb76, desc: '拥有浓厚二氧化碳大气层的岩石行星，强烈的温室效应使其成为太阳系表面温度最高的行星。' },
-            { id: 'mars', name: '火星', r: R_EARTH*0.53, dist: 280, period: 687, color: 0xc1440e, desc: '被称为“红色星球”，地表广泛分布氧化铁。这里有太阳系最高的奥林匹斯山，是人类探索的热点。' },
-            { id: 'jupiter', name: '木星', r: R_EARTH*5, dist: 450, period: 4333, color: 0xffffff, map: createJupiterTexture(), desc: '太阳系中体积和质量最大的气态巨行星，自转极快。拥有巨大的风暴系统“大红斑”和大量卫星。' },
-            { id: 'saturn', name: '土星', r: R_EARTH*4.2, dist: 650, period: 10759, color: 0xead6b8, hasRings: true, innerR: R_EARTH*5.5, outerR: R_EARTH*9.5, desc: '体积第二大的气态行星，以其由无数冰块、岩石组成的宽阔而壮丽的行星环系统而闻名，整体密度极低。' },
-            { id: 'uranus', name: '天王星', r: R_EARTH*2.0, dist: 850, period: 30685, color: 0xd1e7e7, desc: '自转轴倾角极大，几乎是“躺”在轨道上公转。大气中丰富的甲烷吸收了红光，使其呈现出淡蓝绿色。' },
-            { id: 'neptune', name: '海王星', r: R_EARTH*1.9, dist: 1050, period: 60189, color: 0x5b5ddf, desc: '距离太阳最远的已知行星，是一颗冰巨星。表面呈现深蓝色，这里有太阳系中最强烈的超音速风暴。' }
+            { id: 'mercury', name: '水星', r: R_EARTH*0.38, dist: 80, period: 88, color: 0x888888, desc: '距离太阳最近的行星，体积最小。' },
+            { id: 'venus', name: '金星', r: R_EARTH*0.95, dist: 130, period: 225, color: 0xe3bb76, desc: '拥有浓厚二氧化碳大气层的岩石行星。' },
+            { id: 'mars', name: '火星', r: R_EARTH*0.53, dist: 280, period: 687, color: 0xc1440e, desc: '被称为“红色星球”，人类探索的热点。' },
+            { id: 'jupiter', name: '木星', r: R_EARTH*5, dist: 450, period: 4333, color: 0xffffff, map: createJupiterTexture(), desc: '太阳系中体积最大的气态巨行星。' },
+            { id: 'saturn', name: '土星', r: R_EARTH*4.2, dist: 650, period: 10759, color: 0xead6b8, hasRings: true, innerR: R_EARTH*5.5, outerR: R_EARTH*9.5, desc: '拥有宽阔壮丽行星环的星体。' },
+            { id: 'uranus', name: '天王星', r: R_EARTH*2.0, dist: 850, period: 30685, color: 0xd1e7e7, desc: '自转轴极度倾斜的冰巨星。' },
+            { id: 'neptune', name: '海王星', r: R_EARTH*1.9, dist: 1050, period: 60189, color: 0x5b5ddf, desc: '表面呈现深蓝色的冰巨星。' }
         ];
 
         const planetsData = [];
-
         planetsConfig.forEach(p => {
-            const matParams = { roughness: 0.6 };
-            if(p.map) matParams.map = p.map; else matParams.color = p.color;
+            const matParams = { roughness: 0.6 }; if(p.map) matParams.map = p.map; else matParams.color = p.color;
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 32, 32), new THREE.MeshStandardMaterial(matParams));
-            
-            // 【修好了阴影BUG】不再向地球投射错误阴影
-            mesh.castShadow = false; 
-            mesh.receiveShadow = true;
-            mesh.userData = { isPlanet: true, config: p };
-            
+            mesh.castShadow = false; mesh.receiveShadow = true; mesh.userData = { isPlanet: true, config: p };
             if(p.hasRings) {
-                const ringGeo = new THREE.RingGeometry(p.innerR, p.outerR, 64);
-                const pos = ringGeo.attributes.position; const v3 = new THREE.Vector3();
+                const ringGeo = new THREE.RingGeometry(p.innerR, p.outerR, 64); const pos = ringGeo.attributes.position; const v3 = new THREE.Vector3();
                 for (let i = 0; i < pos.count; i++) { v3.fromBufferAttribute(pos, i); ringGeo.attributes.uv.setXY(i, (v3.length()-p.innerR)/(p.outerR-p.innerR), 0); }
                 const ringMat = new THREE.MeshBasicMaterial({ map: createSaturnRingTexture(), side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
                 const ring = new THREE.Mesh(ringGeo, ringMat); ring.rotation.x = Math.PI / 2 - 0.4; mesh.add(ring);
@@ -410,14 +349,14 @@
                 document.getElementById('pic-period').innerText = config.period; document.getElementById('pic-desc').innerText = config.desc; document.getElementById('planet-info-card').classList.remove('card-hidden');
             }
         });
-
         document.getElementById('close-planet-card').addEventListener('click', () => { document.getElementById('planet-info-card').classList.add('card-hidden'); });
 
-        // === 3. UI与逻辑状态 ===
         let timeDays = 0; let isPlaying = true; let timeSpeed = 2.0; 
-        let refFrame = 'heliocentric'; let currentTrackingTarget = 'system'; let moonPhaseOffset = 0; let isPlanetsEnabled = false;
+        let refFrame = 'heliocentric'; let currentTrackingTarget = 'system'; let isPlanetsEnabled = false;
         let lastTargetWorldPos = new THREE.Vector3(0,0,0); let isCameraTransitioning = false; let transitionProgress = 0;
         let transitionStartCamPos = new THREE.Vector3(); let transitionStartTargetPos = new THREE.Vector3(); let targetEndCamPos = new THREE.Vector3(); let targetEndTargetPos = new THREE.Vector3();
+        
+        let isTrackingPhase = false; 
 
         const getTargetWorldPosition = (targetId) => {
             if (targetId === 'system') return new THREE.Vector3(0,0,0); if (targetId === 'sun') return sunGroup.position.clone();
@@ -425,6 +364,11 @@
         };
 
         const focusCameraOn = (targetId, customOffset = null) => {
+            // 🚀【修复】退出月相模式时，必须恢复鼠标的旋转和平移功能
+            isTrackingPhase = false; 
+            controls.enableRotate = true; 
+            controls.enablePan = true;
+            
             currentTrackingTarget = targetId; const targetPos = getTargetWorldPosition(targetId); targetEndTargetPos.copy(targetPos);
             if (customOffset) targetEndCamPos.copy(targetPos).add(customOffset);
             else {
@@ -435,12 +379,12 @@
             document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active')); if(document.getElementById(`cam-${targetId}`)) document.getElementById(`cam-${targetId}`).classList.add('active');
             const names = {'system':'系统全景', 'earth':'地球', 'moon':'月球'}; document.getElementById('target-status').innerText = names[targetId] || '太阳';
             const planetsContainer = document.getElementById('planets-ctrl-container');
-            if (targetId === 'system') { planetsContainer.style.opacity = '1'; planetsContainer.style.pointerEvents = 'auto'; planetsContainer.style.height = 'auto'; } else { planetsContainer.style.opacity = '0.3'; planetsContainer.style.pointerEvents = 'none'; }
+            if (targetId === 'system') { planetsContainer.style.opacity = '1'; planetsContainer.style.pointerEvents = 'auto'; } else { planetsContainer.style.opacity = '0.3'; planetsContainer.style.pointerEvents = 'none'; }
         };
 
         const updateTooltip = (title, desc, icon="💡") => {
             const tt = document.getElementById('teacher-tooltip'); document.getElementById('tt-title').innerText = title; document.getElementById('tt-desc').innerText = desc; document.getElementById('tt-icon').innerText = icon;
-            tt.classList.remove('tooltip-hidden'); setTimeout(() => tt.classList.add('tooltip-hidden'), 8000);
+            tt.classList.remove('tooltip-hidden'); setTimeout(() => tt.classList.add('tooltip-hidden'), 9000);
         };
 
         document.getElementById('btn-fullscreen').addEventListener('click', () => { if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
@@ -454,7 +398,6 @@
             isPlanetsEnabled = !isPlanetsEnabled; planetsGroup.visible = isPlanetsEnabled;
             if(isPlanetsEnabled) {
                 this.classList.add('planet-btn-active'); this.innerHTML = "🌌 隐藏外层行星"; focusCameraOn('system', new THREE.Vector3(0, 800, 1400));
-                updateTooltip("🪐 太阳系全家福", "现在你可以用鼠标【点击任意行星】查看它的科普信息卡片啦！在地心说下更能看到扭曲的行星逆行轨迹！", "✨");
             } else {
                 this.classList.remove('planet-btn-active'); this.innerHTML = "🪐 开启八大行星运行"; focusCameraOn('system'); document.getElementById('planet-info-card').classList.add('card-hidden'); 
             }
@@ -485,12 +428,11 @@
             if(isShowSunlight) { this.classList.replace('bg-yellow-900/50', 'bg-yellow-700'); status.innerText = "已开启"; status.className = "bg-yellow-500 text-black font-bold px-1 rounded text-[10px]"; } 
             else { this.classList.replace('bg-yellow-700', 'bg-yellow-900/50'); status.innerText = "隐藏"; status.className = "bg-yellow-950 text-yellow-500 px-1 rounded text-[10px]"; }
         });
-
         document.getElementById('btn-subsolar').addEventListener('click', function() {
             isShowSubsolar = !isShowSubsolar; subsolarMarker.visible = isShowSubsolar; heatmapMesh.visible = isShowSubsolar; 
             if(isShowSubsolar) {
                 this.className = "w-full bg-red-900 hover:bg-red-800 border border-red-500 text-red-100 font-bold py-2 px-3 rounded-lg text-xs transition flex justify-center items-center gap-2 mt-auto cursor-pointer shadow-[0_4px_15px_rgba(220,38,38,0.5)]";
-                document.getElementById('subsolar-text').innerText = "隐藏直射点与温度场"; updateTooltip("🌡️ 全球地表温差热力图", "已开启！红色代表接收阳光最多的高温区，蓝色代表接收阳光少的低温区。", "🔥");
+                document.getElementById('subsolar-text').innerText = "隐藏直射点与温度场";
             } else {
                 this.className = "w-full bg-orange-900/60 hover:bg-orange-800 border border-orange-500/50 text-orange-200 font-bold py-2 px-3 rounded-lg text-xs transition flex justify-center items-center gap-2 mt-auto cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.3)]";
                 document.getElementById('subsolar-text').innerText = "显示直射点与温度场";
@@ -502,39 +444,104 @@
             isPlaying = true; document.getElementById('play-btn').innerHTML = '⏸'; focusCameraOn(trackTarget, customOffset);
         };
 
+        function findNextEclipseTime(startTime, isLunar) {
+            let t = startTime + 2; 
+            const dt = 0.1; 
+            const ePos = new THREE.Vector3();
+            const mLocalPos = new THREE.Vector3();
+            const mWorldPos = new THREE.Vector3();
+            const dirS2E = new THREE.Vector3();
+            const dirE2M = new THREE.Vector3();
+            const dirS2M = new THREE.Vector3();
+            const dirM2E = new THREE.Vector3();
+            const proj = new THREE.Vector3();
+            const axisX = new THREE.Vector3(1, 0, 0);
+            const axisY = new THREE.Vector3(0, 1, 0);
+
+            for(let i=0; i<36500; i++) { 
+                t += dt;
+                const eAng = (t / 365.25) * Math.PI * 2;
+                ePos.set(Math.cos(eAng)*DIST_EARTH, 0, -Math.sin(eAng)*DIST_EARTH);
+                
+                const nodeAngle = -(t / 6793) * Math.PI * 2;
+                const mAng = (t / 27.32) * Math.PI * 2;
+                mLocalPos.set(Math.cos(mAng)*DIST_MOON, 0, -Math.sin(mAng)*DIST_MOON);
+                mLocalPos.applyAxisAngle(axisX, INCLINATION);
+                mLocalPos.applyAxisAngle(axisY, nodeAngle);
+                mWorldPos.addVectors(ePos, mLocalPos);
+                
+                if (isLunar) {
+                    dirS2E.copy(ePos).normalize(); 
+                    dirE2M.subVectors(mWorldPos, ePos);
+                    const dot = dirE2M.dot(dirS2E);
+                    if (dot > 0) { 
+                        proj.copy(dirS2E).multiplyScalar(dot); 
+                        const perpDist = dirE2M.subVectors(dirE2M, proj).length();
+                        if (perpDist < R_EARTH * 0.8) return t - 0.8; 
+                    }
+                } else {
+                    dirS2M.copy(mWorldPos).normalize(); 
+                    dirM2E.subVectors(ePos, mWorldPos);
+                    const dot = dirM2E.dot(dirS2M);
+                    if (dot > 0) { 
+                        proj.copy(dirS2M).multiplyScalar(dot); 
+                        const perpDist = dirM2E.subVectors(dirM2E, proj).length();
+                        if (perpDist < R_EARTH * 0.4) return t - 0.8; 
+                    }
+                }
+            }
+            return startTime; 
+        }
+
+        document.getElementById('btn-solar-eclipse').addEventListener('click', () => { 
+            timeDays = findNextEclipseTime(timeDays, false);
+            const eAng = (timeDays / 365.25) * Math.PI * 2;
+            const ePos = new THREE.Vector3(Math.cos(eAng)*DIST_EARTH, 0, -Math.sin(eAng)*DIST_EARTH);
+            const camOffset = ePos.clone().normalize().multiplyScalar(-25).add(new THREE.Vector3(0, 6, 8));
+            setObservationMode(0.003, 'earth', camOffset); 
+            updateTooltip("🌑 时空跃迁：寻觅日食", `已穿越时空寻找下一次日食！请盯着地球，等待月球的巨大物理阴影跨越海面！`, "🚀");
+        });
+        document.getElementById('btn-lunar-eclipse').addEventListener('click', () => { 
+            timeDays = findNextEclipseTime(timeDays, true);
+            const eAng = (timeDays / 365.25) * Math.PI * 2; const ePos = new THREE.Vector3(Math.cos(eAng)*DIST_EARTH, 0, -Math.sin(eAng)*DIST_EARTH);
+            const mAng = (timeDays / 27.32) * Math.PI * 2; const mLocalPos = new THREE.Vector3(Math.cos(mAng)*DIST_MOON, 0, -Math.sin(mAng)*DIST_MOON);
+            mLocalPos.applyAxisAngle(new THREE.Vector3(1,0,0), INCLINATION); mLocalPos.applyAxisAngle(new THREE.Vector3(0,1,0), -(timeDays / 6793) * Math.PI * 2);
+            const mWorldPos = ePos.clone().add(mLocalPos);
+            const camOffset = mWorldPos.clone().sub(ePos).normalize().multiplyScalar(-10).add(new THREE.Vector3(2, 3, 0));
+            setObservationMode(0.003, 'moon', camOffset); 
+            updateTooltip("🌕 时空跃迁：寻觅血月", `已在时光中拦截下一次完美交会！地球巨大阴影将从边缘切入吞没月面。`, "🚀");
+        });
+        
+        // 🚀【核心交互触发】：点击演示月相，触发绝对的锁死模式
+        document.getElementById('btn-moon-phases').addEventListener('click', () => { 
+            focusCameraOn('moon'); 
+            isTrackingPhase = true; // 开启动态引力锁死
+            
+            // 彻底禁用鼠标的旋转和平移，严防用户手动偏离观测轴线！但依然保留缩放功能
+            controls.enableRotate = false; 
+            controls.enablePan = false; 
+            
+            timeSpeed = 1.0; speedSlider.value = 1.0; speedDisplay.innerText = `1.0 天/秒`;
+            isPlaying = true; document.getElementById('play-btn').innerHTML = '⏸';
+            updateTooltip("🌖 演示月相盈亏周期", "视野已强制绝对锁定为【背靠地球，直视月球】的连线！请注意：现在鼠标已无法旋转视角（但支持滚轮缩放）。你会看到极其完美的月相渐变！", "🔭");
+        });
+
         let polarViewMode = 0; 
         document.getElementById('btn-polar-day-night').addEventListener('click', () => {
             polarViewMode = (polarViewMode + 1) % 3; const btnSpan = document.getElementById('polar-status');
             if (polarViewMode === 1) { 
                 if(!showPolars) document.getElementById('btn-toggle-polars').click(); if(!showTerminator) document.getElementById('btn-toggle-terminator').click();
                 if(!isEarthTilted) document.getElementById('btn-toggle-tilt').click(); if(!isShowSunlight) document.getElementById('btn-sunlight').click();
-                timeDays = 365.25 * 0.5; // 【修复】夏至
-                setObservationMode(0.05, 'earth', new THREE.Vector3(12, 27.5, 0)); // 【修复】相机完美对准倾斜后的北极点
+                timeDays = 365.25 * 0.5; setObservationMode(0.05, 'earth', new THREE.Vector3(12, 27.5, 0)); 
                 btnSpan.innerText = "北极俯视"; btnSpan.className = "bg-blue-600 text-white px-1 rounded text-[10px]";
-                updateTooltip("❄️ 北极极昼现象", "已切换至夏至俯视视角，镜头精准对准倾斜的物理北极点。你能清楚看到晨昏线完美切分北极圈。", "🌞");
             } else if (polarViewMode === 2) { 
                 if(!showPolars) document.getElementById('btn-toggle-polars').click(); if(!showTerminator) document.getElementById('btn-toggle-terminator').click();
                 if(!isEarthTilted) document.getElementById('btn-toggle-tilt').click();
-                timeDays = 0; // 【修复】冬至
-                setObservationMode(0.05, 'earth', new THREE.Vector3(-12, -27.5, 0)); // 【修复】相机完美对准倾斜后的南极点
+                timeDays = 0; setObservationMode(0.05, 'earth', new THREE.Vector3(-12, -27.5, 0)); 
                 btnSpan.innerText = "南极俯视"; btnSpan.className = "bg-red-600 text-white px-1 rounded text-[10px]";
-                updateTooltip("🐧 南极极昼现象", "已切换至冬至仰视视角，镜头精准对准南极点。此时太阳直射南回归线，南极圈内全天处于白昼。", "🌞");
             } else { 
                 setObservationMode(2.0, 'earth'); btnSpan.innerText = "点击切换俯视"; btnSpan.className = "bg-cyan-950 px-1 rounded text-[10px]";
-                updateTooltip("🌍 恢复常规视角", "已退出两极极昼观测模式。", "✨");
             }
-        });
-
-        // 【核心机位升级】针对光影重构后调整至绝佳的阴影观测点
-        document.getElementById('btn-solar-eclipse').addEventListener('click', () => { 
-            timeDays = 0; moonPhaseOffset = Math.PI; 
-            setObservationMode(0.005, 'earth', new THREE.Vector3(-25, 6, 20)); // 移至向阳面观察物理阴影
-            updateTooltip("🌑 观测日全食过程", "请紧盯地球表面！由于光影物理引擎已解锁，你会看到月球投下的真实阴影斑块（带有柔和半影），正缓缓划过地球表面！", "🔭");
-        });
-        document.getElementById('btn-lunar-eclipse').addEventListener('click', () => { 
-            timeDays = 0; moonPhaseOffset = 0; 
-            setObservationMode(0.005, 'moon', new THREE.Vector3(6, 2, 8)); // 贴脸观察巨大地影吞噬月球
-            updateTooltip("🌕 观测血月吞噬过程", "极佳观测点！请盯住月球的明暗交界线。地球巨大的弧形阴影正在像刀切一样盖过月球。落入阴影的部分由于无光，反而会透出深邃的暗红色血月！", "🔭");
         });
 
         const setRefFrame = (frame) => {
@@ -544,22 +551,20 @@
             const btnHelio = document.getElementById('btn-heliocentric'), btnGeo = document.getElementById('btn-geocentric');
             if(frame === 'heliocentric') {
                 btnHelio.className = 'epic-btn active-mode text-white font-bold py-1.5 px-2 rounded-lg text-xs cursor-pointer'; btnGeo.className = 'bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold py-1.5 px-2 rounded-lg text-xs transition cursor-pointer';
-                document.getElementById('frame-status').innerText = '太阳系全景 (日心说)'; earthOrbit.visible = true; focusCameraOn('system'); updateTooltip("☀️ 日心说模式", "完美的同心圆轨道！这是哥白尼与开普勒带来的科学革命，宇宙的运行突然变得无比简洁与优雅。", "✨");
+                document.getElementById('frame-status').innerText = '太阳系全景 (日心说)'; earthOrbit.visible = true; focusCameraOn('system');
             } else {
                 btnGeo.className = 'epic-btn active-mode text-white font-bold py-1.5 px-2 rounded-lg text-xs cursor-pointer'; btnHelio.className = 'bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold py-1.5 px-2 rounded-lg text-xs transition cursor-pointer';
-                document.getElementById('frame-status').innerText = '人类视角 (地心说)'; earthOrbit.visible = false; focusCameraOn('earth', new THREE.Vector3(0, 400, 800)); updateTooltip("🌍 地心说破绽：行星逆行", "【请开启八大行星运行并加速时间】看看周围行星的彩色轨迹线！为了强行以地球为中心，行星走出了如同乱麻般的“螺旋结（本轮）”，这就是地心说被淘汰的直观证据！", "😵");
+                document.getElementById('frame-status').innerText = '人类视角 (地心说)'; earthOrbit.visible = false; focusCameraOn('earth', new THREE.Vector3(0, 400, 800));
             }
         };
         document.getElementById('btn-heliocentric').addEventListener('click', () => setRefFrame('heliocentric'));
         document.getElementById('btn-geocentric').addEventListener('click', () => setRefFrame('geocentric'));
 
-        focusCameraOn('system'); updateTooltip("欢迎来到终极星系引擎", "全面升级完毕！现在你可以观察完美的日/月食物理遮蔽过程，并在极圈视角中验证 24 节气的天文准确度！", "🔥");
+        focusCameraOn('system'); updateTooltip("系统启动成功", "全网最硬核的天体物理引擎现已就绪。可任意切换模式进行高精度观测！", "🌌");
 
-        // 【新增算法】二十四节气计算系统所需变量
-        let lastDateString = "";
+        let lastDateString = ""; let lastPhaseString = "";
         const solarTerms = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"];
 
-        // === 4. 核心渲染循环 ===
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
@@ -572,21 +577,15 @@
                 if (Math.abs(earthTiltGroup.rotation.z - targetTilt) > 0.001) earthTiltGroup.rotation.z += (targetTilt - earthTiltGroup.rotation.z) * 0.1; else earthTiltGroup.rotation.z = targetTilt;
 
                 const eAng = (timeDays / 365.25) * Math.PI * 2;
-                
-                // --- 【新功能】执行二十四节气与日期更新 ---
-                const baseDate = new Date(2023, 11, 22); // 以冬至日作为基点
+                const baseDate = new Date(2023, 11, 22);
                 const currentDate = new Date(baseDate.getTime() + timeDays * 24 * 60 * 60 * 1000);
                 const month = currentDate.getMonth() + 1; const date = currentDate.getDate();
                 const degree = ((timeDays / 365.25) * 360 % 360 + 360) % 360;
                 const termIndex = Math.floor(degree / 15);
                 const newDateString = `${month}月${date}日 [${solarTerms[termIndex]}]`;
-                if (newDateString !== lastDateString) {
-                    document.getElementById('date-status').innerText = newDateString;
-                    lastDateString = newDateString;
-                }
+                if (newDateString !== lastDateString) { document.getElementById('date-status').innerText = newDateString; lastDateString = newDateString; }
 
                 const ePosAbs = new THREE.Vector3(Math.cos(eAng)*DIST_EARTH, 0, -Math.sin(eAng)*DIST_EARTH);
-                
                 if (refFrame === 'heliocentric') { sunGroup.position.set(0,0,0); earthPosGroup.position.copy(ePosAbs); } 
                 else { earthPosGroup.position.set(0,0,0); sunGroup.position.copy(ePosAbs).negate(); }
 
@@ -594,24 +593,50 @@
                 shadowLight.position.copy(sunGroup.position); shadowLight.target.position.copy(earthPosGroup.position); shadowLight.target.updateMatrixWorld();
                 if (showTerminator) terminatorMesh.lookAt(sunGroup.position);
 
-                // --- 月球 ---
-                const mAng = (timeDays / 27.3) * Math.PI * 2 + moonPhaseOffset;
-                moonMesh.position.set(Math.cos(mAng)*DIST_MOON, 0, Math.sin(mAng)*DIST_MOON);
-                moonMesh.rotation.y = -mAng - Math.PI / 2;
+                lunarNodeGroup.rotation.y = -(timeDays / 6793) * Math.PI * 2;
+                const mAng = (timeDays / 27.32) * Math.PI * 2;
+                moonMesh.position.set(Math.cos(mAng)*DIST_MOON, 0, -Math.sin(mAng)*DIST_MOON);
+                moonMesh.rotation.y = mAng + Math.PI / 2;
                 
-                // 【核心光影修复】真实地影划过月球表面的逻辑
                 const sPos = sunGroup.position; const ePos = earthPosGroup.position; const mWorldPos = moonMesh.getWorldPosition(new THREE.Vector3());
                 const sToEDir = ePos.clone().sub(sPos).normalize(); const eToM = mWorldPos.clone().sub(ePos);
                 const dotProduct = eToM.dot(sToEDir);
                 
-                // 如果月球跑到地球身后，赋予其暗红底色，依靠物理阴影遮盖来呈现漂亮的弧形明暗交界
                 if (dotProduct > 0) {
-                    moonMat.emissive.setHex(0x660505);
-                    moonMat.emissiveIntensity = 0.85;
+                    const proj = sToEDir.clone().multiplyScalar(dotProduct); 
+                    const perpDist = eToM.clone().sub(proj).length();
+                    if (perpDist < R_EARTH * 1.2) {
+                        const intensity = 1.0 - Math.min(perpDist / (R_EARTH * 1.2), 1.0);
+                        moonMat.emissive.setHex(0x660505); 
+                        moonMat.emissiveIntensity = 0.85 * intensity;
+                    } else {
+                        moonMat.emissive.setHex(0x000000); 
+                        moonMat.emissiveIntensity = 0;
+                    }
                 } else { 
                     moonMat.emissive.setHex(0x000000); 
-                    moonMat.emissiveIntensity = 0;
+                    moonMat.emissiveIntensity = 0; 
                 }
+
+                // 月相文字的物理计算完全正确！在强制锁定机位后，画面与文字将会完美匹配！
+                const e2s = new THREE.Vector3().subVectors(sunGroup.position, earthPosGroup.position).setY(0).normalize();
+                const e2m = new THREE.Vector3().subVectors(mWorldPos, earthPosGroup.position).setY(0).normalize();
+                let phaseAngle = Math.atan2(e2s.clone().cross(e2m).y, e2s.dot(e2m));
+                if (phaseAngle < 0) phaseAngle += Math.PI * 2;
+                const phaseDegree = phaseAngle * 180 / Math.PI;
+
+                let phaseName = ""; let phaseIcon = "";
+                if (phaseDegree < 22.5 || phaseDegree >= 337.5) { phaseName = "新月(朔)"; phaseIcon = "🌑"; }
+                else if (phaseDegree < 67.5) { phaseName = "蛾眉月"; phaseIcon = "🌒"; }
+                else if (phaseDegree < 112.5) { phaseName = "上弦月"; phaseIcon = "🌓"; }
+                else if (phaseDegree < 157.5) { phaseName = "盈凸月"; phaseIcon = "🌔"; }
+                else if (phaseDegree < 202.5) { phaseName = "满月(望)"; phaseIcon = "🌕"; }
+                else if (phaseDegree < 247.5) { phaseName = "亏凸月"; phaseIcon = "🌖"; }
+                else if (phaseDegree < 292.5) { phaseName = "下弦月"; phaseIcon = "🌗"; }
+                else { phaseName = "残月"; phaseIcon = "🌘"; }
+
+                const newPhaseString = `${phaseIcon} ${phaseName}`;
+                if (newPhaseString !== lastPhaseString) { document.getElementById('moon-phase-status').innerText = newPhaseString; lastPhaseString = newPhaseString; }
 
                 earthMesh.rotation.y = timeDays * Math.PI * 2 + eAng; cloudMesh.rotation.y = timeDays * Math.PI * 2 * 1.03 + eAng;
 
@@ -651,19 +676,51 @@
             }
 
             const currentTargetWorldPos = getTargetWorldPosition(currentTrackingTarget);
+            
             if (isCameraTransitioning) {
+                // 🚀 在飞行动画期间：实时修正落点，确保它直接落在地球-月球的直线上
+                if (isTrackingPhase) {
+                    const ePos = earthPosGroup.position;
+                    const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
+                    const dirM2E = new THREE.Vector3().subVectors(ePos, mPos).normalize();
+                    targetEndTargetPos.copy(mPos);
+                    targetEndCamPos.copy(mPos).add(dirM2E.multiplyScalar(12)); 
+                }
+                
                 transitionProgress += delta * 1.5; 
                 if (transitionProgress >= 1) { transitionProgress = 1; isCameraTransitioning = false; controls.enabled = true; lastTargetWorldPos.copy(currentTargetWorldPos); }
                 const easeOutQuart = 1 - Math.pow(1 - transitionProgress, 4);
                 const dynamicEndCamPos = targetEndCamPos.clone().add(currentTargetWorldPos.clone().sub(targetEndTargetPos));
                 camera.position.lerpVectors(transitionStartCamPos, dynamicEndCamPos, easeOutQuart);
                 controls.target.lerpVectors(transitionStartTargetPos, currentTargetWorldPos, easeOutQuart);
+                
+                controls.update(); 
             } else {
                 const posDelta = currentTargetWorldPos.clone().sub(lastTargetWorldPos);
-                controls.target.add(posDelta); camera.position.add(posDelta); lastTargetWorldPos.copy(currentTargetWorldPos);
+                controls.target.add(posDelta); 
+                camera.position.add(posDelta); 
+                lastTargetWorldPos.copy(currentTargetWorldPos);
+                
+                controls.update(); // 让 OrbitControls 处理正常的阻尼和用户滚轮缩放计算
+                
+                // 🚀 核心强制接管代码：在 OrbitControls 算完之后，立刻夺取权限，强制将摄像机钉死在观测射线上！
+                if (isTrackingPhase) {
+                    const ePos = earthPosGroup.position;
+                    const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
+                    // 取出此时地球向月球的绝对方向向量
+                    const dirM2E = new THREE.Vector3().subVectors(ePos, mPos).normalize();
+                    // 提取用户当前的缩放距离
+                    const dist = camera.position.distanceTo(controls.target);
+                    // 强制覆盖摄像机的世界坐标（将其移到月球正前方，背对地球）
+                    camera.position.copy(mPos).add(dirM2E.multiplyScalar(dist));
+                    // 强制相机注视月球！
+                    camera.lookAt(mPos);
+                    // 同步控件焦点，防止出现异常拉扯
+                    controls.target.copy(mPos);
+                }
             }
 
-            controls.update(); renderer.render(scene, camera);
+            renderer.render(scene, camera);
         }
 
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
@@ -671,3 +728,5 @@
     </script>
 </body>
 </html>
+
+
