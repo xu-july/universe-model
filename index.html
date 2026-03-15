@@ -41,6 +41,10 @@
         .planet-btn-active { animation: pulse-glow 2s infinite; border-color: #eab308 !important; color: #fde047 !important; background: rgba(161, 98, 7, 0.3) !important; }
 
         #left-panel-wrapper { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); will-change: transform; }
+
+        @keyframes toast-slide-up { 0% { opacity: 0; transform: translateY(20px) translateX(20px); } 10% { opacity: 1; transform: translateY(0) translateX(0); } 90% { opacity: 1; transform: translateY(0) translateX(0); } 100% { opacity: 0; transform: translateY(-20px) translateX(0); } }
+        .toast-anim { animation: toast-slide-up 4.5s forwards; }
+        .cursor-meteor { cursor: crosshair !important; }
     </style>
 </head>
 <body class="bg-[#030304] text-white">
@@ -59,6 +63,8 @@
             </div>
             <button id="btn-fullscreen" class="glass-panel px-4 py-2 rounded-full pointer-events-auto text-white hover:bg-white/10 text-sm transition cursor-pointer">🎦 全屏</button>
         </div>
+
+        <div id="toast-container" class="absolute right-4 top-24 flex flex-col gap-2 z-50 pointer-events-none"></div>
 
         <div id="teacher-tooltip" class="absolute top-24 left-1/2 transform -translate-x-1/2 z-40 tooltip-hidden w-11/12 max-w-2xl pointer-events-none">
             <div class="glass-panel p-5 rounded-2xl border-2 border-yellow-500/50 shadow-[0_0_30px_rgba(234,179,8,0.2)] flex gap-4 bg-black/80">
@@ -88,7 +94,7 @@
 
         <div class="flex-grow relative w-full h-full">
             <div id="left-panel-wrapper" class="absolute top-0 bottom-24 left-0 z-30 flex items-center pl-4 transform translate-x-0">
-                <div id="left-panel-content" class="glass-panel rounded-2xl p-4 w-72 sm:w-80 h-full pointer-events-auto overflow-y-auto custom-scroll flex flex-col gap-3 border border-white/10 flex-shrink-0">
+                <div id="left-panel-content" class="glass-panel rounded-2xl p-4 w-72 sm:w-80 h-full pointer-events-auto overflow-y-auto custom-scroll flex flex-col gap-3 border border-white/10 flex-shrink-0 pb-10">
                     
                     <div class="bg-indigo-900/30 p-3 rounded-xl border border-indigo-500/30">
                         <h3 class="text-indigo-300 font-bold text-xs mb-2 flex items-center gap-1">📸 智能伴飞镜头</h3>
@@ -102,6 +108,23 @@
                                 🪐 开启八大行星运行
                             </button>
                         </div>
+                    </div>
+
+                    <!-- 🚀 苏教版 科学核心实验模块 -->
+                    <div class="bg-emerald-900/30 p-3 rounded-xl border border-emerald-500/30 flex flex-col gap-1.5">
+                        <h3 class="text-emerald-300 font-extrabold text-xs mb-1 flex items-center gap-1">🔬 苏教版·重点科学实验</h3>
+                        
+                        <button id="btn-sunrise" class="w-full bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-100 font-bold py-1.5 px-2 rounded-lg text-[10px] transition flex justify-between items-center cursor-pointer">
+                            <span>🌅 谁先迎来黎明</span> <span class="bg-emerald-950 px-1 rounded text-[9px] text-emerald-300">时差与自转关系</span>
+                        </button>
+
+                        <button id="btn-sundial" class="w-full bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-100 font-bold py-1.5 px-2 rounded-lg text-[10px] transition flex justify-between items-center cursor-pointer">
+                            <span>晷 日晷与影子观测</span> <span class="bg-emerald-950 px-1 rounded text-[9px] text-emerald-300">太阳高度角规律</span>
+                        </button>
+
+                        <button id="btn-meteor" class="w-full bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-100 font-bold py-1.5 px-2 rounded-lg text-[10px] transition flex justify-between items-center cursor-pointer">
+                            <span>☄️ 模拟环形山</span> <span class="bg-emerald-950 px-1 rounded text-[9px] text-emerald-300">点击月面发陨石</span>
+                        </button>
                     </div>
 
                     <div class="bg-black/50 p-3 rounded-xl border border-pink-500/30">
@@ -166,7 +189,7 @@
                         <span class="font-bold flex items-center gap-1">⏱️ 时间流速控制</span>
                         <span id="speed-display" class="font-bold text-orange-400 font-mono w-24 text-right bg-orange-900/30 px-2 py-1 rounded">2.0 天/秒</span>
                     </div>
-                    <input type="range" id="speed-slider" min="0" max="30" value="2" step="0.1" class="cursor-pointer">
+                    <input type="range" id="speed-slider" min="0" max="30" value="2" step="0.01" class="cursor-pointer">
                 </div>
             </div>
         </div>
@@ -221,7 +244,9 @@
         starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(starsPos, 3));
         scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({color:0xffffff, size:1.2, transparent:true, opacity:0.8})));
         
-        scene.add(new THREE.AmbientLight(0x111118, 0.2)); 
+        const ambientLight = new THREE.AmbientLight(0x111118, 0.2); 
+        scene.add(ambientLight); 
+
         const sunLight = new THREE.PointLight(0xffeedd, 1.0, 6000); scene.add(sunLight);
         
         const shadowLight = new THREE.DirectionalLight(0xffffff, 4.0);
@@ -279,14 +304,29 @@
         const heatmapMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.004, 64, 64), heatmapMaterial); heatmapMesh.visible = false; earthMesh.add(heatmapMesh);
         const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.008, 64, 64), new THREE.MeshStandardMaterial({ map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png'), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); earthMesh.add(cloudMesh);
 
+        // 🚀 终极坐标修正：保证地球贴图与标记点、晨昏线绝对匹配
+        const getSurfacePosition = (lat, lon, radius) => {
+            const phi = (90 - lat) * (Math.PI / 180);
+            const theta = lon * (Math.PI / 180); 
+            const x = radius * Math.sin(phi) * Math.cos(theta);
+            const y = radius * Math.cos(phi);
+            const z = -radius * Math.sin(phi) * Math.sin(theta);
+            return new THREE.Vector3(x, y, z);
+        };
+
         const makeLatLine = (lat, color, isDashed=false) => {
-            const y = R_EARTH * Math.sin(lat * Math.PI/180); const r = R_EARTH * Math.cos(lat * Math.PI/180) * 1.015; const pts = []; 
-            for(let i=0; i<=128; i++) pts.push(new THREE.Vector3(r*Math.cos(i/128*Math.PI*2), y, r*Math.sin(i/128*Math.PI*2)));
+            const pts = []; 
+            for(let i=0; i<=128; i++) {
+                const lon = (i / 128) * 360 - 180;
+                pts.push(getSurfacePosition(lat, lon, R_EARTH * 1.015));
+            }
             const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), isDashed ? new THREE.LineDashedMaterial({color: color, dashSize: 0.3, gapSize: 0.3}) : new THREE.LineBasicMaterial({color: color, linewidth: 2}));
             if(isDashed) line.computeLineDistances(); earthMesh.add(line); return line;
         };
         const equatorLine = makeLatLine(0, 0x00ff00); const northTropicLine = makeLatLine(23.5, 0xffff00, true); const southTropicLine = makeLatLine(-23.5, 0xffff00, true);
         const northPolarLine = makeLatLine(66.5, 0x00ffff, true); northPolarLine.visible = false; const southPolarLine = makeLatLine(-66.5, 0x00ffff, true); southPolarLine.visible = false;
+        
+        // 物理晨昏线指示圈
         const terminatorMesh = new THREE.Mesh(new THREE.TorusGeometry(R_EARTH * 1.012, 0.04, 16, 100), new THREE.MeshBasicMaterial({color: 0xff4400, transparent: true, opacity: 0.8}));
         terminatorMesh.visible = false; earthPosGroup.add(terminatorMesh); 
 
@@ -351,24 +391,142 @@
         });
         document.getElementById('close-planet-card').addEventListener('click', () => { document.getElementById('planet-info-card').classList.add('card-hidden'); });
 
+        // =========================================================================
+        // 🚀 苏教版科学核心实验支持系统 (深度重构精校版)
+        // =========================================================================
+        
+        // 1. 【谁先迎来黎明】扩充到 16 个代表性城市
+        const citiesInfo = [
+            { name: '北京', lat: 39.9, lon: 116.4, color: '#ef4444' }, 
+            { name: '上海', lat: 31.2, lon: 121.5, color: '#f43f5e' }, 
+            { name: '哈尔滨', lat: 45.8, lon: 126.5, color: '#3b82f6' }, 
+            { name: '拉萨', lat: 29.6, lon: 91.1, color: '#a855f7' }, 
+            { name: '乌鲁木齐', lat: 43.8, lon: 87.6, color: '#f59e0b' }, 
+            { name: '喀什', lat: 39.4, lon: 75.9, color: '#d97706' }, 
+            { name: '台北', lat: 25.0, lon: 121.5, color: '#ec4899' }, 
+            { name: '东京', lat: 35.7, lon: 139.7, color: '#10b981' }, 
+            { name: '悉尼', lat: -33.9, lon: 151.2, color: '#14b8a6' }, 
+            { name: '莫斯科', lat: 55.7, lon: 37.6, color: '#8b5cf6' }, 
+            { name: '伦敦', lat: 51.5, lon: 0.0, color: '#6366f1' }, 
+            { name: '巴黎', lat: 48.8, lon: 2.3, color: '#8b5cf6' }, 
+            { name: '开罗', lat: 30.0, lon: 31.2, color: '#eab308' }, 
+            { name: '纽约', lat: 40.7, lon: -74.0, color: '#0ea5e9' }, 
+            { name: '华盛顿', lat: 38.9, lon: -77.0, color: '#0284c7' }, 
+            { name: '巴西利亚', lat: -15.8, lon: -47.9, color: '#22c55e' }
+        ];
+        const cityMarkers = [];
+        let isSunriseMode = false;
+        
+        citiesInfo.forEach(c => {
+            const markerMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({color: c.color}));
+            markerMesh.position.copy(getSurfacePosition(c.lat, c.lon, R_EARTH * 1.01));
+            markerMesh.visible = false; earthMesh.add(markerMesh);
+            
+            const label = document.createElement('div');
+            label.className = 'absolute text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none transition-opacity duration-300';
+            label.style.backgroundColor = c.color; label.style.color = 'white'; label.style.opacity = '0';
+            label.innerText = c.name;
+            document.getElementById('ui-layer').appendChild(label);
+            
+            cityMarkers.push({ config: c, mesh: markerMesh, label: label, lastDot: -1 });
+        });
+
+        const spawnToast = (text, color) => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'glass-panel px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center gap-2 toast-anim shadow-lg mb-2';
+            toast.style.borderLeft = `4px solid ${color}`; toast.innerHTML = text;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4500);
+        };
+
+        // 2. 🚀【日晷与影子】引入局部北极四元数锁定与影子防断裂几何学
+        let isSundialMode = false;
+        const sundialGroup = new THREE.Group();
+        
+        const orientToSurface = (mesh, lat, lon, radius) => {
+            const pos = getSurfacePosition(lat, lon, radius);
+            mesh.position.copy(pos);
+            const normal = pos.clone().normalize(); 
+            const posNorth = getSurfacePosition(lat + 1, lon, radius); 
+            const north = posNorth.clone().sub(pos).normalize(); 
+            const east = new THREE.Vector3().crossVectors(north, normal).normalize(); 
+            const exactNorth = new THREE.Vector3().crossVectors(normal, east).normalize(); 
+            const m = new THREE.Matrix4();
+            m.makeBasis(east, normal, exactNorth.clone().negate()); 
+            mesh.quaternion.setFromRotationMatrix(m);
+        };
+        
+        orientToSurface(sundialGroup, 39.9, 116.4, R_EARTH * 1.005);
+        
+        const dialPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.02, 32), new THREE.MeshStandardMaterial({color: 0xeeeeee}));
+        const gnomon = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.25, 8), new THREE.MeshStandardMaterial({color: 0x222222}));
+        gnomon.position.y = 0.125; 
+        
+        const shadowPivot = new THREE.Group();
+        shadowPivot.position.set(0, 0.015, 0); 
+        
+        const shadowGeo = new THREE.PlaneGeometry(0.04, 1);
+        shadowGeo.translate(0, 0.5, 0); 
+        const fakeShadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({color: 0x111111, transparent: true, opacity: 0.8, side: THREE.DoubleSide}));
+        fakeShadow.rotation.x = -Math.PI / 2; 
+        shadowPivot.add(fakeShadow);
+        
+        sundialGroup.add(dialPlate); sundialGroup.add(gnomon); sundialGroup.add(shadowPivot);
+        sundialGroup.visible = false; earthMesh.add(sundialGroup);
+
+        // 3. 🚀【模拟大小随机陨石环形山】系统
+        let isMeteorMode = false;
+        document.getElementById('canvas-container').addEventListener('click', (e) => {
+            if(!isMeteorMode) return;
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(moonMesh);
+            if(intersects.length > 0) {
+                const pt = intersects[0].point; 
+                const craterSize = R_EARTH * (0.02 + Math.random() * 0.06);
+                const crater = new THREE.Mesh(new THREE.CircleGeometry(craterSize, 16), new THREE.MeshBasicMaterial({color: 0x1a1a1a, transparent: true, opacity: 0.9, depthWrite: false}));
+                const localPt = moonMesh.worldToLocal(pt.clone());
+                const localNormal = intersects[0].face.normal.clone(); 
+                
+                crater.position.copy(localPt).add(localNormal.clone().multiplyScalar(0.02));
+                moonMesh.add(crater);
+                crater.lookAt(moonMesh.localToWorld(localPt.clone().add(localNormal)));
+                spawnToast(`💥 随机陨石撞击！形成 ${craterSize > 0.15 ? '巨型' : '微型'}环形山！`, "#ef4444");
+            }
+        });
+
+        // =========================================================================
+
         let timeDays = 0; let isPlaying = true; let timeSpeed = 2.0; 
         let refFrame = 'heliocentric'; let currentTrackingTarget = 'system'; let isPlanetsEnabled = false;
         let lastTargetWorldPos = new THREE.Vector3(0,0,0); let isCameraTransitioning = false; let transitionProgress = 0;
         let transitionStartCamPos = new THREE.Vector3(); let transitionStartTargetPos = new THREE.Vector3(); let targetEndCamPos = new THREE.Vector3(); let targetEndTargetPos = new THREE.Vector3();
-        
         let isTrackingPhase = false; 
+
+        // 🚀【绝对防冲突机制】：重置并肃清环境光及所有组件状态
+        const resetSpecialModes = () => {
+            isSunriseMode = false; isSundialMode = false; isMeteorMode = false;
+            cityMarkers.forEach(c => { c.mesh.visible = false; c.label.style.opacity = '0'; });
+            sundialGroup.visible = false; 
+            document.body.classList.remove('cursor-meteor');
+            isTrackingPhase = false; controls.enableRotate = true; controls.enablePan = true;
+            ambientLight.intensity = 0.2; ambientLight.color.setHex(0x111118); 
+            
+            document.querySelectorAll('.active-mode, .planet-btn-active').forEach(el => {
+                if(el.id !== 'btn-heliocentric' && el.id !== 'btn-geocentric' && el.id !== 'btn-toggle-planets') el.classList.remove('active-mode');
+            });
+        };
 
         const getTargetWorldPosition = (targetId) => {
             if (targetId === 'system') return new THREE.Vector3(0,0,0); if (targetId === 'sun') return sunGroup.position.clone();
-            if (targetId === 'earth') return earthPosGroup.position.clone(); if (targetId === 'moon') return moonMesh.getWorldPosition(new THREE.Vector3()); return new THREE.Vector3(0,0,0);
+            if (targetId === 'earth') return earthPosGroup.position.clone(); if (targetId === 'moon') return moonMesh.getWorldPosition(new THREE.Vector3()); 
+            if (targetId === 'sundial') return sundialGroup.getWorldPosition(new THREE.Vector3());
+            return new THREE.Vector3(0,0,0);
         };
 
         const focusCameraOn = (targetId, customOffset = null) => {
-            // 🚀【修复】退出月相模式时，必须恢复鼠标的旋转和平移功能
-            isTrackingPhase = false; 
-            controls.enableRotate = true; 
-            controls.enablePan = true;
-            
+            resetSpecialModes(); 
             currentTrackingTarget = targetId; const targetPos = getTargetWorldPosition(targetId); targetEndTargetPos.copy(targetPos);
             if (customOffset) targetEndCamPos.copy(targetPos).add(customOffset);
             else {
@@ -377,9 +535,7 @@
             }
             transitionStartCamPos.copy(camera.position); transitionStartTargetPos.copy(controls.target); transitionProgress = 0; isCameraTransitioning = true; controls.enabled = false; 
             document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active')); if(document.getElementById(`cam-${targetId}`)) document.getElementById(`cam-${targetId}`).classList.add('active');
-            const names = {'system':'系统全景', 'earth':'地球', 'moon':'月球'}; document.getElementById('target-status').innerText = names[targetId] || '太阳';
-            const planetsContainer = document.getElementById('planets-ctrl-container');
-            if (targetId === 'system') { planetsContainer.style.opacity = '1'; planetsContainer.style.pointerEvents = 'auto'; } else { planetsContainer.style.opacity = '0.3'; planetsContainer.style.pointerEvents = 'none'; }
+            const names = {'system':'系统全景', 'earth':'地球', 'moon':'月球', 'sundial':'北京日晷'}; document.getElementById('target-status').innerText = names[targetId] || '太阳';
         };
 
         const updateTooltip = (title, desc, icon="💡") => {
@@ -390,19 +546,45 @@
         document.getElementById('btn-fullscreen').addEventListener('click', () => { if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
         document.getElementById('play-btn').addEventListener('click', function() { isPlaying = !isPlaying; this.innerHTML = isPlaying?'⏸':'▶'; });
         const speedSlider = document.getElementById('speed-slider'); const speedDisplay = document.getElementById('speed-display');
-        speedSlider.addEventListener('input', e => { timeSpeed = parseFloat(e.target.value); speedDisplay.innerText = `${timeSpeed.toFixed(1)} 天/秒`; });
+        speedSlider.addEventListener('input', e => { timeSpeed = parseFloat(e.target.value); speedDisplay.innerText = `${timeSpeed.toFixed(2)} 天/秒`; });
 
         document.getElementById('cam-system').addEventListener('click', () => focusCameraOn('system')); document.getElementById('cam-earth').addEventListener('click', () => focusCameraOn('earth')); document.getElementById('cam-moon').addEventListener('click', () => focusCameraOn('moon'));
 
         document.getElementById('btn-toggle-planets').addEventListener('click', function() {
             isPlanetsEnabled = !isPlanetsEnabled; planetsGroup.visible = isPlanetsEnabled;
-            if(isPlanetsEnabled) {
-                this.classList.add('planet-btn-active'); this.innerHTML = "🌌 隐藏外层行星"; focusCameraOn('system', new THREE.Vector3(0, 800, 1400));
-            } else {
-                this.classList.remove('planet-btn-active'); this.innerHTML = "🪐 开启八大行星运行"; focusCameraOn('system'); document.getElementById('planet-info-card').classList.add('card-hidden'); 
-            }
+            if(isPlanetsEnabled) { this.classList.add('planet-btn-active'); this.innerHTML = "🌌 隐藏外层行星"; focusCameraOn('system', new THREE.Vector3(0, 800, 1400)); } 
+            else { this.classList.remove('planet-btn-active'); this.innerHTML = "🪐 开启八大行星运行"; focusCameraOn('system'); document.getElementById('planet-info-card').classList.add('card-hidden'); }
             if (typeof planetsData !== 'undefined') { planetsData.forEach(item => { if (item.trailPoints) item.trailPoints = []; if (item.trailLine) item.trailLine.geometry.setFromPoints([]); }); }
             if (typeof sunTrailPoints !== 'undefined') { sunTrailPoints.length = 0; if (typeof sunTrailLine !== 'undefined') sunTrailLine.geometry.setFromPoints([]); }
+        });
+
+        // 🚀 【苏教版 专属实验按钮绑定】
+        document.getElementById('btn-sunrise').addEventListener('click', function() {
+            focusCameraOn('earth', new THREE.Vector3(0, 15, 25));
+            isSunriseMode = true; cityMarkers.forEach(c => { c.mesh.visible = true; c.lastDot = 1; });
+            
+            // 🚀 极慢速设定：0.01天/秒，自动强制开启晨昏线
+            timeSpeed = 0.01; speedSlider.value = 0.01; speedDisplay.innerText = `0.01 天/秒`; isPlaying = true;
+            if (!showTerminator) document.getElementById('btn-toggle-terminator').click();
+            
+            this.classList.add('active-mode');
+            updateTooltip("🌅 谁先迎来黎明", "五年级下册重点实验！转速已调至极低(0.01天/秒)并自动开启晨昏辅助线。现在贴图偏移已经完美校准，东边的城市会率先跨越晨昏线迎来白天。注意看右上角的日出播报！", "🌍");
+        });
+
+        document.getElementById('btn-sundial').addEventListener('click', function() {
+            focusCameraOn('sundial'); // 动态接管摄像机，视角逻辑在 animate 中彻底锁死
+            isSundialMode = true; sundialGroup.visible = true;
+            timeSpeed = 0.1; speedSlider.value = 0.1; speedDisplay.innerText = `0.10 天/秒`; isPlaying = true;
+            this.classList.add('active-mode');
+            updateTooltip("晷 日晷物理投影观测", "镜头已绝对锁定在北京的日晷上！地球在你眼中是静止的。利用纯物理的几何光影，你可以清晰看到一天中影子指向西边(晨) -> 北边短影(正午) -> 东边(昏) 的完美自然规律！影子从根部无缝延伸！", "☀️");
+        });
+
+        document.getElementById('btn-meteor').addEventListener('click', function() {
+            focusCameraOn('moon');
+            isMeteorMode = true; document.body.classList.add('cursor-meteor');
+            timeSpeed = 1.0; speedSlider.value = 1.0; speedDisplay.innerText = `1.00 天/秒`;
+            this.classList.add('active-mode');
+            updateTooltip("☄️ 模拟大小不一的环形山", "实验开启！鼠标已变为准心，点击月球表面。巨大的撞击能量会在月面上留下各种大小不一的陨石坑，且坑洞将永远牢牢跟随月球自转，绝不漂移！", "💥");
         });
 
         document.getElementById('btn-toggle-tilt').addEventListener('click', function() {
@@ -421,7 +603,11 @@
         document.getElementById('btn-toggle-equator').addEventListener('click', () => { showEquator = !showEquator; equatorLine.visible = showEquator; toggleBtnState('btn-toggle-equator', showEquator, 'green'); });
         document.getElementById('btn-toggle-tropics').addEventListener('click', () => { showTropics = !showTropics; northTropicLine.visible = showTropics; southTropicLine.visible = showTropics; toggleBtnState('btn-toggle-tropics', showTropics, 'yellow'); });
         document.getElementById('btn-toggle-polars').addEventListener('click', () => { showPolars = !showPolars; northPolarLine.visible = showPolars; southPolarLine.visible = showPolars; toggleBtnState('btn-toggle-polars', showPolars, 'cyan'); });
-        document.getElementById('btn-toggle-terminator').addEventListener('click', () => { showTerminator = !showTerminator; terminatorMesh.visible = showTerminator; toggleBtnState('btn-toggle-terminator', showTerminator, 'orange'); });
+        
+        document.getElementById('btn-toggle-terminator').addEventListener('click', () => { 
+            showTerminator = !showTerminator; terminatorMesh.visible = showTerminator; 
+            toggleBtnState('btn-toggle-terminator', showTerminator, 'orange'); 
+        });
 
         document.getElementById('btn-sunlight').addEventListener('click', function() {
             isShowSunlight = !isShowSunlight; sunlightGroup.visible = isShowSunlight; const status = document.getElementById('sunlight-status');
@@ -512,17 +698,13 @@
             updateTooltip("🌕 时空跃迁：寻觅血月", `已在时光中拦截下一次完美交会！地球巨大阴影将从边缘切入吞没月面。`, "🚀");
         });
         
-        // 🚀【核心交互触发】：点击演示月相，触发绝对的锁死模式
-        document.getElementById('btn-moon-phases').addEventListener('click', () => { 
+        document.getElementById('btn-moon-phases').addEventListener('click', function() { 
             focusCameraOn('moon'); 
-            isTrackingPhase = true; // 开启动态引力锁死
-            
-            // 彻底禁用鼠标的旋转和平移，严防用户手动偏离观测轴线！但依然保留缩放功能
-            controls.enableRotate = false; 
-            controls.enablePan = false; 
-            
-            timeSpeed = 1.0; speedSlider.value = 1.0; speedDisplay.innerText = `1.0 天/秒`;
+            isTrackingPhase = true; 
+            controls.enableRotate = false; controls.enablePan = false; 
+            timeSpeed = 1.0; speedSlider.value = 1.0; speedDisplay.innerText = `1.00 天/秒`;
             isPlaying = true; document.getElementById('play-btn').innerHTML = '⏸';
+            this.classList.add('active-mode');
             updateTooltip("🌖 演示月相盈亏周期", "视野已强制绝对锁定为【背靠地球，直视月球】的连线！请注意：现在鼠标已无法旋转视角（但支持滚轮缩放）。你会看到极其完美的月相渐变！", "🔭");
         });
 
@@ -560,7 +742,7 @@
         document.getElementById('btn-heliocentric').addEventListener('click', () => setRefFrame('heliocentric'));
         document.getElementById('btn-geocentric').addEventListener('click', () => setRefFrame('geocentric'));
 
-        focusCameraOn('system'); updateTooltip("系统启动成功", "全网最硬核的天体物理引擎现已就绪。可任意切换模式进行高精度观测！", "🌌");
+        focusCameraOn('system'); updateTooltip("科学实验教具重组完毕", "已剔除冗余项，专注四大核心物理实验！晨昏线坐标彻底对齐真实地理贴图，日晷摄像机锁定系统重构，陨石坑系统已支持自然随机大小变化！", "🌌");
 
         let lastDateString = ""; let lastPhaseString = "";
         const solarTerms = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"];
@@ -574,6 +756,7 @@
 
             if (isPlaying) {
                 timeDays += timeSpeed * delta; 
+                
                 if (Math.abs(earthTiltGroup.rotation.z - targetTilt) > 0.001) earthTiltGroup.rotation.z += (targetTilt - earthTiltGroup.rotation.z) * 0.1; else earthTiltGroup.rotation.z = targetTilt;
 
                 const eAng = (timeDays / 365.25) * Math.PI * 2;
@@ -591,6 +774,8 @@
 
                 sunLight.position.copy(sunGroup.position);
                 shadowLight.position.copy(sunGroup.position); shadowLight.target.position.copy(earthPosGroup.position); shadowLight.target.updateMatrixWorld();
+                
+                // 物理晨昏线直接锁定光源方向，不受地球自转和倾角干扰
                 if (showTerminator) terminatorMesh.lookAt(sunGroup.position);
 
                 lunarNodeGroup.rotation.y = -(timeDays / 6793) * Math.PI * 2;
@@ -603,22 +788,11 @@
                 const dotProduct = eToM.dot(sToEDir);
                 
                 if (dotProduct > 0) {
-                    const proj = sToEDir.clone().multiplyScalar(dotProduct); 
-                    const perpDist = eToM.clone().sub(proj).length();
-                    if (perpDist < R_EARTH * 1.2) {
-                        const intensity = 1.0 - Math.min(perpDist / (R_EARTH * 1.2), 1.0);
-                        moonMat.emissive.setHex(0x660505); 
-                        moonMat.emissiveIntensity = 0.85 * intensity;
-                    } else {
-                        moonMat.emissive.setHex(0x000000); 
-                        moonMat.emissiveIntensity = 0;
-                    }
-                } else { 
-                    moonMat.emissive.setHex(0x000000); 
-                    moonMat.emissiveIntensity = 0; 
-                }
+                    const proj = sToEDir.clone().multiplyScalar(dotProduct); const perpDist = eToM.clone().sub(proj).length();
+                    if (perpDist < R_EARTH * 1.2) { moonMat.emissive.setHex(0x660505); moonMat.emissiveIntensity = 0.85 * (1.0 - Math.min(perpDist / (R_EARTH * 1.2), 1.0)); } 
+                    else { moonMat.emissive.setHex(0x000000); moonMat.emissiveIntensity = 0; }
+                } else { moonMat.emissive.setHex(0x000000); moonMat.emissiveIntensity = 0; }
 
-                // 月相文字的物理计算完全正确！在强制锁定机位后，画面与文字将会完美匹配！
                 const e2s = new THREE.Vector3().subVectors(sunGroup.position, earthPosGroup.position).setY(0).normalize();
                 const e2m = new THREE.Vector3().subVectors(mWorldPos, earthPosGroup.position).setY(0).normalize();
                 let phaseAngle = Math.atan2(e2s.clone().cross(e2m).y, e2s.dot(e2m));
@@ -646,21 +820,54 @@
                     heatmapMaterial.uniforms.localSunDir.value.copy(sunPosLocal);
                 }
 
-                if (isShowSunlight) {
-                    const dirToEarth = new THREE.Vector3().subVectors(earthPosGroup.position, sunGroup.position).normalize();
-                    const upVec = new THREE.Vector3(0, 1, 0); if (Math.abs(dirToEarth.y) > 0.99) upVec.set(1, 0, 0); 
-                    const rightVec = new THREE.Vector3().crossVectors(dirToEarth, upVec).normalize();
-                    const realUpVec = new THREE.Vector3().crossVectors(rightVec, dirToEarth).normalize();
-                    const spread = R_EARTH * 1.2; const basePos = dirToEarth.clone().multiplyScalar(-R_EARTH * 5); 
-                    sunArrows[0].position.copy(basePos); sunArrows[0].setDirection(dirToEarth);
-                    sunArrows[1].position.copy(basePos).add(rightVec.clone().multiplyScalar(spread)); sunArrows[1].setDirection(dirToEarth);
-                    sunArrows[2].position.copy(basePos).add(rightVec.clone().multiplyScalar(-spread)); sunArrows[2].setDirection(dirToEarth);
-                    sunArrows[3].position.copy(basePos).add(realUpVec.clone().multiplyScalar(spread)); sunArrows[3].setDirection(dirToEarth);
-                    sunArrows[4].position.copy(basePos).add(realUpVec.clone().multiplyScalar(-spread)); sunArrows[4].setDirection(dirToEarth);
+                // 🚀 2. 黎明日出播报物理逻辑
+                if (isSunriseMode) {
+                    const sunDirGlob = sunGroup.position.clone().sub(earthPosGroup.position).normalize();
+                    cityMarkers.forEach(c => {
+                        const worldPos = c.mesh.getWorldPosition(new THREE.Vector3());
+                        const normal = worldPos.clone().sub(earthPosGroup.position).normalize();
+                        const dirToCam = camera.position.clone().sub(worldPos).normalize();
+                        
+                        if (normal.dot(dirToCam) < -0.1) { c.label.style.opacity = '0'; } 
+                        else {
+                            const screenPos = worldPos.clone().project(camera);
+                            const x = (screenPos.x * .5 + .5) * window.innerWidth;
+                            const y = (screenPos.y * -.5 + .5) * window.innerHeight;
+                            c.label.style.transform = `translate(-50%, -150%) translate(${x}px, ${y}px)`;
+                            c.label.style.opacity = '1';
+                        }
+                        const dot = normal.dot(sunDirGlob);
+                        // 当地表法线从背光（<0）转为向光（>0）的瞬间，触发播报
+                        if (c.lastDot <= 0 && dot > 0 && timeSpeed > 0 && timeSpeed < 5) {
+                            spawnToast(`☀️ 晨昏线跨越：【${c.config.name}】迎来日出！`, c.config.color);
+                        }
+                        c.lastDot = dot;
+                    });
                 }
-                
-                if (sunTrailPoints.length === 0 || sunTrailPoints[sunTrailPoints.length-1].distanceTo(sunGroup.position) > 2) {
-                    sunTrailPoints.push(sunGroup.position.clone()); if (sunTrailPoints.length > 1000) sunTrailPoints.shift(); sunTrailLine.geometry.setFromPoints(sunTrailPoints);
+
+                // 🚀 3. 日晷几何投影物理逻辑 (极致物理精准修复，根部绝不断裂)
+                if(isSundialMode) {
+                    const sunWorld = sunGroup.getWorldPosition(new THREE.Vector3());
+                    // 计算太阳相对于日晷平台的局部空间向量
+                    const localSun = sundialGroup.worldToLocal(sunWorld);
+                    
+                    if(localSun.y > 0) { // 太阳在水平面之上
+                        shadowPivot.children[0].visible = true; // fakeShadow 显示
+                        const gnomonHeight = 0.25;
+                        const sx = -localSun.x; const sz = -localSun.z; // 提取背光向量
+                        const sunDistHorizontal = Math.sqrt(sx*sx + sz*sz);
+                        
+                        // 基于相似三角形计算准确影子长度
+                        let shadowLen = (gnomonHeight * sunDistHorizontal) / localSun.y;
+                        shadowLen = Math.min(shadowLen, 1.5); // 防止清晨傍晚影子无限长穿模
+                        
+                        // Z轴控制长度，影子永远紧贴 Pivot 原点(即日晷根部)向 Z轴方向延伸
+                        shadowPivot.scale.set(1, 1, shadowLen);
+                        // Atan2 精准计算偏转角，实现影子反向追踪太阳
+                        shadowPivot.rotation.y = Math.atan2(sx, sz);
+                    } else {
+                        shadowPivot.children[0].visible = false; // 夜晚没影子
+                    }
                 }
 
                 if (isPlanetsEnabled) {
@@ -678,15 +885,24 @@
             const currentTargetWorldPos = getTargetWorldPosition(currentTrackingTarget);
             
             if (isCameraTransitioning) {
-                // 🚀 在飞行动画期间：实时修正落点，确保它直接落在地球-月球的直线上
                 if (isTrackingPhase) {
-                    const ePos = earthPosGroup.position;
-                    const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
+                    const ePos = earthPosGroup.position; const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
                     const dirM2E = new THREE.Vector3().subVectors(ePos, mPos).normalize();
-                    targetEndTargetPos.copy(mPos);
-                    targetEndCamPos.copy(mPos).add(dirM2E.multiplyScalar(12)); 
+                    targetEndTargetPos.copy(mPos); targetEndCamPos.copy(mPos).add(dirM2E.multiplyScalar(12)); 
                 }
                 
+                // 🚀 日晷视角的镜头平滑切入演算：不再颠倒
+                if (currentTrackingTarget === 'sundial') {
+                    const sdWorldPos = sundialGroup.getWorldPosition(new THREE.Vector3());
+                    const localNorth = new THREE.Vector3(0, 1, 0).applyQuaternion(earthTiltGroup.quaternion).normalize();
+                    const up = sdWorldPos.clone().sub(earthPosGroup.position).normalize();
+                    const east = new THREE.Vector3().crossVectors(localNorth, up).normalize();
+                    const south = new THREE.Vector3().crossVectors(up, east).normalize();
+                    
+                    targetEndTargetPos.copy(sdWorldPos);
+                    targetEndCamPos.copy(sdWorldPos).add(up.multiplyScalar(1)).add(south.multiplyScalar(1.7));
+                }
+
                 transitionProgress += delta * 1.5; 
                 if (transitionProgress >= 1) { transitionProgress = 1; isCameraTransitioning = false; controls.enabled = true; lastTargetWorldPos.copy(currentTargetWorldPos); }
                 const easeOutQuart = 1 - Math.pow(1 - transitionProgress, 4);
@@ -694,33 +910,44 @@
                 camera.position.lerpVectors(transitionStartCamPos, dynamicEndCamPos, easeOutQuart);
                 controls.target.lerpVectors(transitionStartTargetPos, currentTargetWorldPos, easeOutQuart);
                 
-                controls.update(); 
             } else {
-                const posDelta = currentTargetWorldPos.clone().sub(lastTargetWorldPos);
-                controls.target.add(posDelta); 
-                camera.position.add(posDelta); 
-                lastTargetWorldPos.copy(currentTargetWorldPos);
                 
-                controls.update(); // 让 OrbitControls 处理正常的阻尼和用户滚轮缩放计算
-                
-                // 🚀 核心强制接管代码：在 OrbitControls 算完之后，立刻夺取权限，强制将摄像机钉死在观测射线上！
                 if (isTrackingPhase) {
-                    const ePos = earthPosGroup.position;
-                    const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
-                    // 取出此时地球向月球的绝对方向向量
+                    const ePos = earthPosGroup.position; const mPos = moonMesh.getWorldPosition(new THREE.Vector3());
                     const dirM2E = new THREE.Vector3().subVectors(ePos, mPos).normalize();
-                    // 提取用户当前的缩放距离
                     const dist = camera.position.distanceTo(controls.target);
-                    // 强制覆盖摄像机的世界坐标（将其移到月球正前方，背对地球）
-                    camera.position.copy(mPos).add(dirM2E.multiplyScalar(dist));
-                    // 强制相机注视月球！
-                    camera.lookAt(mPos);
-                    // 同步控件焦点，防止出现异常拉扯
-                    controls.target.copy(mPos);
+                    camera.position.copy(mPos).add(dirM2E.multiplyScalar(dist)); camera.lookAt(mPos);
+                    controls.target.copy(mPos); lastTargetWorldPos.copy(mPos);
+                } else if (currentTrackingTarget === 'sundial') {
+                    // 🚀【绝对防颠倒算法】：引入正交局部坐标系，锁死 UP 向量
+                    const sdWorldPos = sundialGroup.getWorldPosition(new THREE.Vector3());
+                    
+                    // 获取当前地球状态下真实的“正北极”方向，绝不翻转
+                    const localNorth = new THREE.Vector3(0, 1, 0).applyQuaternion(earthTiltGroup.quaternion).normalize();
+                    const up = sdWorldPos.clone().sub(earthPosGroup.position).normalize();
+                    const east = new THREE.Vector3().crossVectors(localNorth, up).normalize();
+                    const south = new THREE.Vector3().crossVectors(up, east).normalize();
+                    
+                    const dist = camera.position.distanceTo(controls.target) || 2;
+                    
+                    // 将摄像机精确挂载在日晷南边，向上俯视
+                    const camPos = sdWorldPos.clone().add(up.multiplyScalar(dist * 0.5)).add(south.multiplyScalar(dist * 0.8)).add(east.multiplyScalar(dist * 0.2));
+                    
+                    camera.position.copy(camPos);
+                    // 核心修复：强制摄像机的上方永远等于地球的北极！地球在你眼中彻底停止自转摇摆！
+                    camera.up.copy(localNorth); 
+                    camera.lookAt(sdWorldPos);
+                    controls.target.copy(sdWorldPos);
+                    lastTargetWorldPos.copy(sdWorldPos);
+                } else {
+                    // 恢复正常的 Y 轴向上规则，防止自由模式时画面倾斜
+                    camera.up.set(0, 1, 0); 
+                    const posDelta = currentTargetWorldPos.clone().sub(lastTargetWorldPos);
+                    controls.target.add(posDelta); camera.position.add(posDelta); lastTargetWorldPos.copy(currentTargetWorldPos);
                 }
             }
 
-            renderer.render(scene, camera);
+            controls.update(); renderer.render(scene, camera);
         }
 
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
@@ -728,5 +955,3 @@
     </script>
 </body>
 </html>
-
-
