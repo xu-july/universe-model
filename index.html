@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>宇宙奥秘探索仪 - 终极科学教具版</title>
+    <title>宇宙奥秘探索仪 - 终极科学教具版 (国内精准优化)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; background-color: #030304 !important; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
@@ -55,6 +55,10 @@
         .typing-dot:nth-child(1) { animation-delay: -0.32s; }
         .typing-dot:nth-child(2) { animation-delay: -0.16s; }
         @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        
+        /* 麦克风录音闪烁动画 */
+        .mic-recording { animation: pulse-red 1.5s infinite; background-color: #ef4444 !important; border-color: #f87171 !important;}
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
     </style>
 </head>
 <body class="bg-[#030304] text-white">
@@ -92,21 +96,26 @@
         <!-- 🚀 AI 助教交互面板 -->
         <div id="ai-panel" class="absolute top-20 right-4 bottom-24 w-80 z-40 pointer-events-auto flex flex-col glass-panel rounded-2xl border-2 border-teal-500/40 shadow-[0_0_25px_rgba(20,184,166,0.3)] bg-black/90">
             <div class="flex justify-between items-center p-3 border-b border-teal-500/30">
-                <h3 class="text-teal-300 font-extrabold text-sm flex items-center gap-2">🤖 科学小助教</h3>
+                <h3 class="text-teal-300 font-extrabold text-sm flex items-center gap-2">🤖 千问 科学小助教</h3>
                 <button id="btn-close-ai" class="text-gray-400 hover:text-white transition cursor-pointer px-2">✖</button>
             </div>
             <div id="chat-history" class="flex-grow p-3 overflow-y-auto custom-scroll flex flex-col gap-3 text-sm">
                 <div class="chat-bubble-ai p-2.5 text-white leading-relaxed">
-                    你好小探索家！我是你的AI科学助教。当你在左侧做实验时，随时点击下方的“✨智能解析”，我会帮你解答屏幕上正在发生的奇妙物理现象哦！
+                    你好小探索家！我是你的AI科学助教。当你在左侧做实验时，随时点击下方的“✨一键智能解析”，或者点击麦克风向我提问，我会用语音为你解答正在发生的天文现象哦！
                 </div>
             </div>
             <div class="p-3 border-t border-teal-500/30 flex flex-col gap-2">
                 <button id="btn-ai-analyze" class="w-full bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-white font-bold py-2 rounded-lg text-[11px] transition shadow-[0_0_10px_rgba(79,70,229,0.5)] cursor-pointer flex justify-center items-center gap-1">
-                    ✨ 智能解析当前实验现象
+                    ✨ 一键智能解析当前实验
                 </button>
-                <div class="flex gap-2">
-                    <input type="text" id="ai-input" placeholder="输入你的科学问题..." class="flex-grow bg-black/50 border border-teal-500/50 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400">
-                    <button id="btn-ai-send" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-3 rounded-lg text-xs transition cursor-pointer">发送</button>
+                <div class="flex gap-1.5 items-center">
+                    <!-- 麦克风按钮 -->
+                    <button id="btn-ai-mic" class="bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer flex justify-center items-center flex-shrink-0" title="语音提问">🎤</button>
+                    <!-- 🛑 智能隐藏的停止语音按钮 -->
+                    <button id="btn-ai-stop-voice" class="hidden bg-red-600 hover:bg-red-500 border border-red-400 text-white px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer flex justify-center items-center flex-shrink-0" title="停止播报">🛑</button>
+                    
+                    <input type="text" id="ai-input" placeholder="输入或语音提问..." class="flex-grow bg-black/50 border border-teal-500/50 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400 w-0">
+                    <button id="btn-ai-send" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition cursor-pointer flex-shrink-0">发送</button>
                 </div>
             </div>
         </div>
@@ -145,6 +154,7 @@
                         </div>
                     </div>
 
+                    <!-- 🚀 苏教版 科学核心实验模块 -->
                     <div class="bg-emerald-900/30 p-3 rounded-xl border border-emerald-500/30 flex flex-col gap-1.5">
                         <h3 class="text-emerald-300 font-extrabold text-xs mb-1 flex items-center gap-1">🔬 苏教版·重点科学实验</h3>
                         
@@ -230,21 +240,123 @@
     </div>
 
     <script>
-        const apiKey = "AIzaSyAm-4bLoIiwrBopuobm5oE-x3cGl79ZUp8"; // 如果在本地桌面运行，请将您在 Google AI Studio 申请的 Gemini API Key 填入此双引号中
+        // 🚀 配置国内 iFlow API
+        const apiKey = "sk-b07db828818e4d68c480a6f1ade257b8"; 
         
-        // 🤖 Gemini AI Helper Logic
+        // 🤖 AI Helper Logic
         const aiPanel = document.getElementById('ai-panel');
         const btnOpenAI = document.getElementById('btn-open-ai');
         const btnCloseAI = document.getElementById('btn-close-ai');
         const btnAiSend = document.getElementById('btn-ai-send');
         const btnAiAnalyze = document.getElementById('btn-ai-analyze');
+        const btnAiMic = document.getElementById('btn-ai-mic'); // 🎤 麦克风按钮
+        const btnAiStopVoice = document.getElementById('btn-ai-stop-voice'); // 🛑 停止语音按钮
         const aiInput = document.getElementById('ai-input');
         const chatHistory = document.getElementById('chat-history');
 
         let isAIOpen = false;
 
+        // 💡 尽早触发浏览器加载语音包（解决首次加载无声音的问题）
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+
+        // 🔊 TTS (文本转语音) 功能模块
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                btnAiStopVoice.classList.add('hidden'); // 重置停止按钮状态
+
+                // 过滤掉 Markdown 符号，让语音读起来更自然
+                const cleanText = text.replace(/[*#_`~-]/g, '').replace(/\n/g, '，');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 1.05; 
+                
+                // 🚀 寻找 Edge 浏览器中的高级“拟人”语音 (Neural Voices)
+                const voices = window.speechSynthesis.getVoices();
+                // 优先级排序：微软晓晓(亲切女声) -> 微软云希(男声) -> 带有 Neural 的其他中文声音 -> 默认中文声音
+                let bestVoice = voices.find(v => v.name.includes('Xiaoxiao Neural')) || 
+                                voices.find(v => v.name.includes('Yunxi Neural')) ||
+                                voices.find(v => v.lang.includes('zh') && v.name.includes('Neural')) ||
+                                voices.find(v => v.name.includes('Yaoyao') || v.name.includes('Kangkang')) ||
+                                voices.find(v => v.lang === 'zh-CN' || v.lang === 'zh-TW');
+                
+                if (bestVoice) {
+                    utterance.voice = bestVoice;
+                }
+
+                // AI 说话时显示停止按钮，说完隐藏
+                utterance.onstart = () => btnAiStopVoice.classList.remove('hidden');
+                utterance.onend = () => btnAiStopVoice.classList.add('hidden');
+                utterance.onerror = () => btnAiStopVoice.classList.add('hidden');
+
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // 🎤 STT (语音转文本) 功能模块
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                aiInput.placeholder = "正在倾听... (请说话)";
+                btnAiMic.classList.add('mic-recording');
+                btnAiMic.classList.remove('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400');
+            };
+
+            recognition.onresult = function(event) {
+                const speechResult = event.results[0][0].transcript;
+                aiInput.value = speechResult;
+                handleAIRequest(speechResult, speechResult); // 识别后发送
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Speech recognition error", event.error);
+                aiInput.placeholder = "没听清，请重试或打字输入...";
+            };
+
+            recognition.onend = function() {
+                if (aiInput.placeholder === "正在倾听... (请说话)") {
+                    aiInput.placeholder = "输入或语音提问...";
+                }
+                btnAiMic.classList.remove('mic-recording');
+                btnAiMic.classList.add('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400');
+            };
+        }
+
+        // 🛑 绑定停止语音按钮的点击事件
+        btnAiStopVoice.addEventListener('click', () => {
+            window.speechSynthesis?.cancel();
+            btnAiStopVoice.classList.add('hidden');
+        });
+
+        btnAiMic.addEventListener('click', () => {
+            if (recognition) {
+                window.speechSynthesis?.cancel();
+                btnAiStopVoice.classList.add('hidden');
+                recognition.start();
+            } else {
+                alert("您的浏览器暂不支持语音识别功能，建议使用 Chrome 或 Edge 浏览器哦。");
+            }
+        });
+
         btnOpenAI.addEventListener('click', () => { isAIOpen = true; aiPanel.classList.add('open'); });
-        btnCloseAI.addEventListener('click', () => { isAIOpen = false; aiPanel.classList.remove('open'); });
+        btnCloseAI.addEventListener('click', () => { 
+            isAIOpen = false; 
+            aiPanel.classList.remove('open'); 
+            window.speechSynthesis?.cancel(); // 面板关闭时，打断 AI 说话
+            btnAiStopVoice.classList.add('hidden');
+        });
 
         const addMessage = (text, isUser = false) => {
             const msgDiv = document.createElement('div');
@@ -264,28 +376,33 @@
             return msgDiv;
         };
 
-        async function callGeminiAPI(prompt) {
-            if (!apiKey) {
-                return "AI老师的通讯密钥(API Key)好像丢失了呢！请在代码的 `const apiKey = \"\"` 处填入您的专属 Gemini Key 哦！";
-            }
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        async function callAIAPI(prompt) {
+            if (!apiKey) return "AI老师的通讯密钥丢失了！";
+            
+            const url = `https://apis.iflow.cn/v1/chat/completions`;
             const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: "你是一位广受小学生喜爱的小学科学老师。你的回答要生动有趣、简单易懂，多用比喻，鼓励探究。回答请控制在150字左右，尽量不用复杂的专业术语。" }] }
+                model: "Qwen3-Max",
+                messages: [
+                    { role: "system", content: "你是一位广受小学生喜爱的小学科学老师（精通苏教版科学课标）。你的回答要生动有趣、简单易懂，多用比喻，鼓励探究。回答请控制在100-150字左右，尽量不用复杂的专业术语。" },
+                    { role: "user", content: prompt }
+                ]
             };
 
-            let retries = 5;
+            let retries = 3;
             let delay = 1000;
             for (let i = 0; i < retries; i++) {
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
                         body: JSON.stringify(payload)
                     });
                     if (!response.ok) throw new Error('API Error');
                     const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "AI老师在思考时遇到了一点小麻烦，请稍后再试。";
+                    return data.choices?.[0]?.message?.content || "AI老师在思考时遇到了一点小麻烦，请稍后再试。";
                 } catch (err) {
                     if (i === retries - 1) return "网络通讯似乎遇到了点小波动，AI助教暂时无法连接，请稍后再试哦。";
                     await new Promise(res => setTimeout(res, delay));
@@ -294,31 +411,41 @@
             }
         }
 
-        const handleAIRequest = async (promptText) => {
-            addMessage(promptText, true);
+        // 🚀 核心修改：分离了 UI显示的文字 (displayText) 和发给大模型的完整数据 (apiPrompt)
+        const handleAIRequest = async (displayText, apiPrompt) => {
+            window.speechSynthesis?.cancel();
+            btnAiStopVoice.classList.add('hidden');
+            
+            addMessage(displayText, true); // UI界面只显示简单的提问语句
             const loadingMsg = addLoadingIndicator();
             aiInput.value = '';
             btnAiSend.disabled = true;
             btnAiAnalyze.disabled = true;
+            btnAiMic.disabled = true;
 
-            const responseText = await callGeminiAPI(promptText);
+            // 后台把包含 3D 信息的超长 API Prompt 偷摸发给大模型
+            const responseText = await callAIAPI(apiPrompt);
             
             loadingMsg.remove();
             addMessage(responseText, false);
+            
+            speakText(responseText); // 🔊 播报语音
+
             btnAiSend.disabled = false;
             btnAiAnalyze.disabled = false;
+            btnAiMic.disabled = false;
         };
 
         btnAiSend.addEventListener('click', () => {
             const text = aiInput.value.trim();
-            if (text) handleAIRequest(text);
+            if (text) handleAIRequest(text, text); // 自由问答时，UI显示和发给AI的内容一样
         });
 
         aiInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && aiInput.value.trim()) handleAIRequest(aiInput.value.trim());
+            if (e.key === 'Enter' && aiInput.value.trim()) handleAIRequest(aiInput.value.trim(), aiInput.value.trim());
         });
 
-        // 🚀 核心更新：极致详尽的 AI 情境感知收集引擎
+        // 🚀 极致详尽的 AI 情境感知收集引擎
         btnAiAnalyze.addEventListener('click', () => {
             let context = `【当前3D天文教具的运行状态参数】\n`;
             context += `- 参照系模型：${refFrame === 'heliocentric' ? '日心说(太阳中心)' : '地心说(地球中心)'}\n`;
@@ -327,7 +454,7 @@
             context += `- 虚拟时间流速：${timeSpeed.toFixed(2)} 天/秒\n`;
             context += `- 实时月相状态：${document.getElementById('moon-phase-status').innerText}\n`;
             context += `- 地球倾角状态：${isEarthTilted ? "真实倾角(23.5°)" : "假设直立(0°)"}\n`;
-            context += `- 太阳系行星显示状态：${isPlanetsEnabled ? "已开启(显示八大行星)" : "已隐藏(仅聚焦地月系)"}\n`;
+            context += `- 太阳系八大行星状态：${isPlanetsEnabled ? "已开启显示（正在环绕运行）" : "隐藏"}\n`;
             
             let lines = [];
             if (showEquator) lines.push("赤道");
@@ -336,19 +463,26 @@
             if (showTerminator) lines.push("晨昏线(昼夜交界线)");
             context += `- 辅助参考线显示：${lines.length > 0 ? lines.join("、") : "无"}\n`;
             
-            if (isShowSunlight) context += `- 物理现象辅助：已在太空中绘制出太阳光束的射线方向\n`;
-            if (isShowSubsolar) context += `- 物理现象辅助：已在地球表面开启太阳直射点标记及温度场热力图\n`;
+            context += `\n【专项科学实验与现象重点解析指南】\n`;
             
-            context += `\n【当前学生正在进行的专项科学实验】\n`;
-            if (isSunriseMode) context += `实验名称：谁先迎来黎明（学生正在观察由于地球自转带来的各地时差变化与日出先后顺序）。\n`;
-            else if (isSundialMode) context += `实验名称：日晷与影子观测（学生正在观察一天中太阳高度角的变化与日晷影子的长短、方向的反向关系）。\n`;
-            else if (isMeteorMode) context += `实验名称：模拟环形山（学生正在使用鼠标点击月球表面，生成大小不一的陨石坑）。\n`;
-            else if (currentTrackingTarget === 'moon') context += `实验名称：月相盈亏周期（学生正锁定视角观察月球围绕地球公转产生的月相变化规律）。\n`;
-            else if (currentTrackingTarget === 'earth') context += `实验名称：地球自转与公转综合观察。\n`;
-            else context += `当前无特定专项实验，学生正在全景自由探索宏大的宇宙。\n`;
+            // 🚀 特别增加的“地心说错觉”解析指令
+            if (refFrame === 'geocentric' && isPlanetsEnabled) {
+                context += `★ 特别关注：当前正处于“地心说”模式，且开启了八大行星！请务必向学生解释为什么以地球为中心时，火星、木星等其他行星的飞行轨迹会如此混乱、疯狂打结（即行星逆行现象的视差）。明确告诉学生地心说是古人的错误认知，而轨迹打结正是因为选错了参照系！\n`;
+            } else if (refFrame === 'geocentric') {
+                context += `★ 特别关注：当前正处于“地心说”模式（地球静止，太阳绕地球转）。请明确告诉学生这曾是古人的错误认知，虽然能解释日夜交替，但并不科学！\n`;
+            }
 
-            const prompt = `请根据以上详尽的3D宇宙模拟器实时数据，像一位亲切、充满智慧的科学老师一样，给我（一个对科学充满好奇的小学生）快速生动地讲解一下屏幕上正在发生的天文现象或科学原理。记得多用简单有趣的比喻！\n\n${context}`;
-            handleAIRequest(prompt);
+            if (isSunriseMode) context += `★ 正在进行的实验：谁先迎来黎明（观察地球自转带来的时差变化，东边城市先看到日出）。\n`;
+            else if (isSundialMode) context += `★ 正在进行的实验：日晷与影子观测（观察太阳高度角变化以及影子方向永远与阳光相反的物理规律）。\n`;
+            else if (isMeteorMode) context += `★ 正在进行的实验：模拟环形山（解释陨石撞击月球表面形成无规则大小坑洞的原因）。\n`;
+            else if (currentTrackingTarget === 'moon') context += `★ 正在进行的实验：月相盈亏周期（锁定月球视角，观察日、地、月三者位置变化产生的月相规律）。\n`;
+            else if (currentTrackingTarget === 'earth' && refFrame === 'heliocentric') context += `★ 当前状态：正在观察地球的公转与自转现象。\n`;
+            else context += `★ 当前状态：正在全景自由探索宏大的太阳系。\n`;
+
+            const apiPrompt = `请根据以上详细的3D宇宙模拟器实时数据，像一位亲切、充满智慧的科学老师一样，给我（小学生）快速生动地用口语化的话语讲解一下屏幕上正在发生的天文现象和对应原理。请直接给出解答内容。`;
+            
+            // 🚀 UI 只显示简短的话，实际发送的是凭借了长篇物理数据的 context + apiPrompt
+            handleAIRequest("✨ 帮我解析一下当前的实验现象和科学原理吧！", context + apiPrompt);
         });
 
         // 现有 3D 引擎及逻辑控制
@@ -448,7 +582,7 @@
         let currentTilt = -23.5 * Math.PI/180; let targetTilt = currentTilt; let isEarthTilted = true;
         const earthTiltGroup = new THREE.Group(); earthTiltGroup.rotation.z = currentTilt; earthPosGroup.add(earthTiltGroup); 
         
-        const earthMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'), bumpMap: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png'), bumpScale: 0.1, roughness: 0.7 });
+        const earthMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: textureLoader.load('https://fastly.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg'), bumpMap: textureLoader.load('https://fastly.jsdelivr.net/npm/three-globe/example/img/earth-topology.png'), bumpScale: 0.1, roughness: 0.7 });
         const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 64, 64), earthMat); earthMesh.castShadow = true; earthMesh.receiveShadow = true; earthTiltGroup.add(earthMesh); 
 
         const heatmapVertexShader = `varying vec3 vNormal; void main() { vNormal = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
@@ -458,14 +592,14 @@
         `;
         const heatmapMaterial = new THREE.ShaderMaterial({ vertexShader: heatmapVertexShader, fragmentShader: heatmapFragmentShader, uniforms: { localSunDir: { value: new THREE.Vector3(1, 0, 0) } }, transparent: true, blending: THREE.NormalBlending, depthWrite: false });
         const heatmapMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.004, 64, 64), heatmapMaterial); heatmapMesh.visible = false; earthMesh.add(heatmapMesh);
-        const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.008, 64, 64), new THREE.MeshStandardMaterial({ map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png'), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); earthMesh.add(cloudMesh);
+        const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH * 1.008, 64, 64), new THREE.MeshStandardMaterial({ map: textureLoader.load('https://fastly.jsdelivr.net/npm/three-globe/example/img/earth-clouds.png'), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })); earthMesh.add(cloudMesh);
 
         const getSurfacePosition = (lat, lon, radius) => {
-            const polar = (90 - lat) * (Math.PI / 180);
-            const azimuth = (lon + 180) * (Math.PI / 180); 
-            const x = -radius * Math.cos(azimuth) * Math.sin(polar);
-            const y = radius * Math.cos(polar);
-            const z = radius * Math.sin(azimuth) * Math.sin(polar);
+            const phi = (90 - lat) * (Math.PI / 180);
+            const theta = lon * (Math.PI / 180); 
+            const x = radius * Math.sin(phi) * Math.cos(theta);
+            const y = radius * Math.cos(phi);
+            const z = -radius * Math.sin(phi) * Math.sin(theta);
             return new THREE.Vector3(x, y, z);
         };
 
@@ -488,7 +622,7 @@
         const lunarTiltGroup = new THREE.Group(); lunarTiltGroup.rotation.x = INCLINATION; lunarNodeGroup.add(lunarTiltGroup);
         const moonGroup = new THREE.Group(); lunarTiltGroup.add(moonGroup);
 
-        const moonMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, map: textureLoader.load('https://unpkg.com/three-globe/example/img/earth-water.png'), roughness: 0.9 });
+        const moonMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, map: textureLoader.load('https://fastly.jsdelivr.net/npm/three-globe/example/img/earth-water.png'), roughness: 0.9 });
         const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH*0.27, 32, 32), moonMat);
         moonMesh.castShadow = true; moonMesh.receiveShadow = true; moonGroup.add(moonMesh);
 
@@ -545,7 +679,6 @@
         });
         document.getElementById('close-planet-card').addEventListener('click', () => { document.getElementById('planet-info-card').classList.add('card-hidden'); });
 
-        // 1. 【谁先迎来黎明】
         const citiesInfo = [
             { name: '北京', lat: 39.9, lon: 116.4, color: '#ef4444' }, { name: '上海', lat: 31.2, lon: 121.5, color: '#f43f5e' }, 
             { name: '哈尔滨', lat: 45.8, lon: 126.5, color: '#3b82f6' }, { name: '拉萨', lat: 29.6, lon: 91.1, color: '#a855f7' }, 
@@ -582,7 +715,6 @@
             setTimeout(() => toast.remove(), 4500);
         };
 
-        // 2. 🚀【日晷与影子】
         let isSundialMode = false;
         const sundialGroup = new THREE.Group();
         
@@ -611,16 +743,14 @@
         const shadowGeo = new THREE.PlaneGeometry(0.04, 1);
         shadowGeo.translate(0, 0.5, 0); 
         const fakeShadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({color: 0x111111, transparent: true, opacity: 0.8, side: THREE.DoubleSide}));
-        // 🚀 终极物理方向修复：将平面翻转至 +Z 轴方向，从而配合后期的 atan2(-sx, -sz) 实现100%完美背向太阳！
         fakeShadow.rotation.x = Math.PI / 2; 
         shadowPivot.add(fakeShadow);
         
         sundialGroup.add(dialPlate); sundialGroup.add(gnomon); sundialGroup.add(shadowPivot);
         sundialGroup.visible = false; earthMesh.add(sundialGroup);
 
-        // 3. 🚀【模拟大小随机陨石环形山】
         let isMeteorMode = false;
-        let activeCraters = []; // 专门用于存储生成的环形山数组，方便统一清空
+        let activeCraters = []; 
         const sharedCraterGeo = new THREE.CircleGeometry(1, 16);
         const sharedCraterMat = new THREE.MeshBasicMaterial({color: 0x1a1a1a, transparent: true, opacity: 0.9, depthWrite: false});
 
@@ -644,7 +774,6 @@
                 crater.position.copy(localPt).add(localNormal.clone().multiplyScalar(0.02));
                 moonMesh.add(crater);
                 
-                // 加入统一管理数组
                 activeCraters.push(crater);
                 
                 crater.lookAt(moonMesh.localToWorld(localPt.clone().add(localNormal)));
@@ -682,7 +811,6 @@
             }
         }, {passive: false});
 
-        // 🚀【防冲突与清理机制】：在切换任何其他模式时，自动抹除环形山痕迹
         const resetSpecialModes = () => {
             isSunriseMode = false; isSundialMode = false; isMeteorMode = false; 
             
@@ -690,7 +818,6 @@
             sundialGroup.visible = false; 
             document.body.classList.remove('cursor-meteor');
             
-            // 自动清除月球表面的模拟陨石坑
             activeCraters.forEach(c => moonMesh.remove(c));
             activeCraters = [];
             
@@ -754,7 +881,7 @@
             if (!showTerminator) document.getElementById('btn-toggle-terminator').click();
             
             this.classList.add('active-mode');
-            updateTooltip("🌅 谁先迎来黎明", "五年级下册重点实验！转速已调至极低(0.01天/秒)并自动开启晨昏辅助线。东边的城市会率先跨越晨昏线迎来白天。注意看右上角的日出播报！", "🌍");
+            updateTooltip("🌅 谁先迎来黎明", "观察重点！转速已调至极低(0.01天/秒)并自动开启晨昏辅助线。东边的城市会率先跨越晨昏线迎来白天。注意看右上角的日出播报！", "🌍");
         });
 
         document.getElementById('btn-sundial').addEventListener('click', function() {
@@ -766,7 +893,7 @@
             controls.enabled = false; 
             
             this.classList.add('active-mode');
-            updateTooltip("晷 日晷一天影长观测", "地球在你眼中已绝对静止且视角被锁定（可滚轮缩放）！你可以清晰看到一天中影子背对阳光所产生的自然伸缩规律！", "☀️");
+            updateTooltip("晷 日晷一天影长观测", "地球在你眼中已绝对静止且视角被锁定（可滚轮缩放）！你可以清晰看到一天中影子永远背对阳光所产生的伸缩与旋转规律！", "☀️");
         });
 
         document.getElementById('btn-meteor').addEventListener('click', function() {
@@ -774,7 +901,7 @@
             isMeteorMode = true; document.body.classList.add('cursor-meteor');
             timeSpeed = 1.0; speedSlider.value = 1.0; speedDisplay.innerText = `1.00 天/秒`;
             this.classList.add('active-mode');
-            updateTooltip("☄️ 模拟大小不一的环形山", "实验开启！鼠标已变为准心，点击月球表面。巨大的撞击能量会在月面上留下大小各异的陨石坑，坑洞将永远牢牢跟随月球自转，绝不漂移！", "💥");
+            updateTooltip("☄️ 模拟大小不一的环形山", "实验开启！鼠标已变为准心，点击月面。引入了随机数算法，巨大的撞击能量会在月面上留下大小各异的陨石坑，坑洞将永远牢牢跟随月球自转，绝不漂移！", "💥");
         });
 
         document.getElementById('btn-toggle-tilt').addEventListener('click', function() {
@@ -916,7 +1043,7 @@
         document.getElementById('btn-heliocentric').addEventListener('click', () => setRefFrame('heliocentric'));
         document.getElementById('btn-geocentric').addEventListener('click', () => setRefFrame('geocentric'));
 
-        focusCameraOn('system'); updateTooltip("科学实验教具完美升级", "已深度集成大模型AI助手，可随时智能解析当前物理现象！日晷、黎明、环形山等核心实验已重构为纯物理驱动！", "🌌");
+        focusCameraOn('system'); updateTooltip("科学实验教具完美升级", "日晷物理投影与环形山系统已100%严谨重构！更集成了高级智能语音互动（支持随时打断），点击右上角召唤AI小助教吧！", "🌌");
 
         let lastDateString = ""; let lastPhaseString = "";
         const solarTerms = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"];
@@ -1026,7 +1153,6 @@
                     });
                 }
 
-                // 🚀 3. 日晷纯物理几何投影 (确保影子与阳光100%反向)
                 if(isSundialMode) {
                     sunGroup.getWorldPosition(_animSunPos);
                     sundialGroup.worldToLocal(_animLocalSun.copy(_animSunPos));
@@ -1041,7 +1167,6 @@
                         shadowLen = Math.min(shadowLen, 1.5); 
                         
                         shadowPivot.scale.set(1, 1, shadowLen);
-                        // 🚀 核心物理方向修复：取负值 (-sx, -sz) 让影子方向完美背离太阳
                         shadowPivot.rotation.y = Math.atan2(-sx, -sz);
                     } else {
                         shadowPivot.children[0].visible = false;
@@ -1086,7 +1211,6 @@
                     isCameraTransitioning = false; 
                     lastTargetWorldPos.copy(currentTargetWorldPos); 
                     
-                    // 如果不是锁定模式，必须恢复控制器
                     if (!isTrackingPhase && currentTrackingTarget !== 'sundial') {
                         controls.enabled = true;
                     }
