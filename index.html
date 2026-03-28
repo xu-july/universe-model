@@ -101,7 +101,7 @@
             </div>
             <div id="chat-history" class="flex-grow p-3 overflow-y-auto custom-scroll flex flex-col gap-3 text-sm">
                 <div class="chat-bubble-ai p-2.5 text-white leading-relaxed">
-                    你好小探索家！我是你的AI科学助教。当你在左侧做实验时，随时点击下方的“✨一键智能解析”，或者点击麦克风向我提问，我会用语音为你解答正在发生的天文现象哦！
+                    你好小探索家！我是你的AI科学助教。当你在左侧做实验时，随时点击下方的“✨一键智能解析”，或者长按麦克风向我提问，我会用语音为你解答正在发生的天文现象哦！
                 </div>
             </div>
             <div class="p-3 border-t border-teal-500/30 flex flex-col gap-2">
@@ -110,11 +110,11 @@
                 </button>
                 <div class="flex gap-1.5 items-center">
                     <!-- 麦克风按钮 -->
-                    <button id="btn-ai-mic" class="bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer flex justify-center items-center flex-shrink-0" title="语音提问">🎤</button>
+                    <button id="btn-ai-mic" class="bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer flex justify-center items-center flex-shrink-0" title="长按语音提问">🎤</button>
                     <!-- 🛑 智能隐藏的停止语音按钮 -->
                     <button id="btn-ai-stop-voice" class="hidden bg-red-600 hover:bg-red-500 border border-red-400 text-white px-2.5 py-1.5 rounded-lg text-sm transition cursor-pointer flex justify-center items-center flex-shrink-0" title="停止播报">🛑</button>
                     
-                    <input type="text" id="ai-input" placeholder="输入或语音提问..." class="flex-grow bg-black/50 border border-teal-500/50 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400 w-0">
+                    <input type="text" id="ai-input" placeholder="输入提问，或长按左侧麦克风..." class="flex-grow bg-black/50 border border-teal-500/50 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400 w-0">
                     <button id="btn-ai-send" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition cursor-pointer flex-shrink-0">发送</button>
                 </div>
             </div>
@@ -256,6 +256,16 @@
 
         let isAIOpen = false;
 
+        // 💡 全局 Toast 提示函数
+        const spawnToast = (text, color) => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'glass-panel px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center gap-2 toast-anim shadow-lg mb-2';
+            toast.style.borderLeft = `4px solid ${color}`; toast.innerHTML = text;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4500);
+        };
+
         // 💡 尽早触发浏览器加载语音包（解决首次加载无声音的问题）
         if ('speechSynthesis' in window) {
             window.speechSynthesis.getVoices();
@@ -301,6 +311,7 @@
         // 🎤 STT (语音转文本) 功能模块
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
+        let isRecognizing = false;
         
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
@@ -309,7 +320,8 @@
             recognition.maxAlternatives = 1;
 
             recognition.onstart = function() {
-                aiInput.placeholder = "正在倾听... (请说话)";
+                isRecognizing = true;
+                aiInput.placeholder = "正在倾听 (松开即可发送)...";
                 btnAiMic.classList.add('mic-recording');
                 btnAiMic.classList.remove('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400');
             };
@@ -322,12 +334,19 @@
 
             recognition.onerror = function(event) {
                 console.error("Speech recognition error", event.error);
-                aiInput.placeholder = "没听清，请重试或打字输入...";
+                isRecognizing = false;
+                if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+                    aiInput.placeholder = "麦克风无法访问，请打字输入";
+                    spawnToast("🎤 无法访问麦克风。请检查设备连接或浏览器权限设置！", "#ef4444");
+                } else if (event.error !== 'aborted') {
+                    aiInput.placeholder = "没听清，请重试或打字输入...";
+                }
             };
 
             recognition.onend = function() {
-                if (aiInput.placeholder === "正在倾听... (请说话)") {
-                    aiInput.placeholder = "输入或语音提问...";
+                isRecognizing = false;
+                if (aiInput.placeholder === "正在倾听 (松开即可发送)...") {
+                    aiInput.placeholder = "输入提问，或长按左侧麦克风...";
                 }
                 btnAiMic.classList.remove('mic-recording');
                 btnAiMic.classList.add('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400');
@@ -340,15 +359,34 @@
             btnAiStopVoice.classList.add('hidden');
         });
 
-        btnAiMic.addEventListener('click', () => {
-            if (recognition) {
-                window.speechSynthesis?.cancel();
-                btnAiStopVoice.classList.add('hidden');
-                recognition.start();
-            } else {
-                alert("您的浏览器暂不支持语音识别功能，建议使用 Chrome 或 Edge 浏览器哦。");
+        // 🎤 长按录音触发机制
+        const startRecording = (e) => {
+            if (e.type === 'touchstart') e.preventDefault(); // 防止移动端穿透触发默认行为
+            if (!recognition) {
+                spawnToast("⚠️ 您的浏览器不支持语音识别，推荐使用 Chrome/Edge", "#ef4444");
+                return;
             }
-        });
+            if (isRecognizing) return; 
+            window.speechSynthesis?.cancel();
+            btnAiStopVoice.classList.add('hidden');
+            try {
+                recognition.start();
+            } catch (err) {}
+        };
+
+        const stopRecording = (e) => {
+            if (!isRecognizing) return;
+            try {
+                recognition.stop();
+            } catch (err) {}
+        };
+
+        btnAiMic.addEventListener('mousedown', startRecording);
+        btnAiMic.addEventListener('touchstart', startRecording, {passive: false});
+        
+        // 松开事件绑定在整个 window 上，避免鼠标滑出按钮区域后录音无法停止
+        window.addEventListener('mouseup', stopRecording);
+        window.addEventListener('touchend', stopRecording, {passive: false});
 
         btnOpenAI.addEventListener('click', () => { isAIOpen = true; aiPanel.classList.add('open'); });
         btnCloseAI.addEventListener('click', () => { 
@@ -706,15 +744,6 @@
             cityMarkers.push({ config: c, mesh: markerMesh, label: label, lastDot: -1 });
         });
 
-        const spawnToast = (text, color) => {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'glass-panel px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center gap-2 toast-anim shadow-lg mb-2';
-            toast.style.borderLeft = `4px solid ${color}`; toast.innerHTML = text;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 4500);
-        };
-
         let isSundialMode = false;
         const sundialGroup = new THREE.Group();
         
@@ -979,6 +1008,7 @@
             const camOffset = ePos.clone().normalize().multiplyScalar(-25).add(new THREE.Vector3(0, 6, 8));
             timeSpeed = 0.003; speedSlider.value = 0.003; speedDisplay.innerText = `0.00 天/秒`; isPlaying = true;
             focusCameraOn('earth', camOffset); 
+            currentEclipseMode = 'solar'; // 🚀 标记进入日食状态
             updateTooltip("🌑 时空跃迁：寻觅日食", `已穿越时空寻找下一次日食！请盯着地球，等待月球的巨大物理阴影跨越海面！`, "🚀");
         });
         document.getElementById('btn-lunar-eclipse').addEventListener('click', () => { 
@@ -990,6 +1020,7 @@
             const camOffset = mWorldPos.clone().sub(ePos).normalize().multiplyScalar(-10).add(new THREE.Vector3(2, 3, 0));
             timeSpeed = 0.003; speedSlider.value = 0.003; speedDisplay.innerText = `0.00 天/秒`; isPlaying = true;
             focusCameraOn('moon', camOffset); 
+            currentEclipseMode = 'lunar'; // 🚀 标记进入月食状态
             updateTooltip("🌕 时空跃迁：寻觅血月", `已在时光中拦截下一次完美交会！地球巨大阴影将从边缘切入吞没月面。`, "🚀");
         });
         
